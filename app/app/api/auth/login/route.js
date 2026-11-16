@@ -1,8 +1,8 @@
 import { cookies } from "next/headers";
-import { getSessionUser, SESSION_COOKIE, cookieOptions } from "../../../lib/auth";
-import { assertSameOrigin, json, rateLimit, registerLoginFailure, clearLoginFailures, audit } from "../../../lib/http";
+import { getSessionUser, SESSION_COOKIE, cookieOptions } from "../../../../lib/auth";
+import { assertSameOrigin, json, rateLimit, registerLoginFailure, clearLoginFailures, audit } from "../../../../lib/http";
 import bcrypt from "bcryptjs";
-import { pool } from "../../../lib/db";
+import { pool } from "../../../../lib/db";
 
 // POST /api/auth/login — e-mail + password (+ TOTP when enabled on the account).
 // Brute-force controls: in-memory limiter + durable account lockout (SEC-6).
@@ -30,7 +30,7 @@ export async function POST(req) {
   }
 
   const r = await pool.query(
-    "SELECT id, hashedPassword, role, nom, totp_enabled, totp_secret, locked_until, actif FROM users_web WHERE email = $1",
+    "SELECT id, hashedpassword AS \"hashedPassword\", role, nom, totp_enabled, totp_secret, locked_until, actif FROM users_web WHERE email = $1",
     [email]
   );
   const user = r.rows[0];
@@ -49,7 +49,7 @@ export async function POST(req) {
 
   if (user.totp_enabled) {
     if (!totp) return json({ error: "Code 2FA requis pour ce profil" }, 401);
-    const { verifyTotp } = require("../../../lib/totp");
+    const { verifyTotp } = require("../../../../lib/totp");
     if (!verifyTotp(user.totp_secret, totp)) {
       await registerLoginFailure(email);
       return json({ error: "Code 2FA invalide" }, 401);
@@ -67,7 +67,7 @@ export async function POST(req) {
 }
 
 async function createSessionWrapped(userId) {
-  const { createSession } = require("../../../lib/auth");
+  const { createSession } = require("../../../../lib/auth");
   return createSession(userId);
 }
 
