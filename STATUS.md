@@ -10,7 +10,7 @@ Created: 2026-11-16 00:36
 - [x] Phase 3 — Code (`app/`) — 11 modules construits, testés et committés un par un
 - [x] Phase 4 — Local test — 11/11 routes PASS 200 ; `qa-check.sh` 0 FAIL / 0 WARN
 - [x] Phase 4.5 — Security audit (`security/REPORT.md`) — gate PASS : 20 PASS / 0 FAIL / 0 WARN ; 2 needs_validation (déploiement), 7 rejets prouvés, 0 confirmé
-- [ ] Phase 5 — Handoff (`HANDOFF.md`)
+- [x] Phase 5 — Handoff (`HANDOFF.md` écrit, commit 401592f) — **déploiement en attente de votre autorisation séparée**
 
 ## Modules
 
