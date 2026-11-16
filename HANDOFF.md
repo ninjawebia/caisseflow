@@ -55,7 +55,8 @@ make install      # dépendances (première fois)
 make migrate      # PostgreSQL Docker + migrations idempotentes
 make seed         # données de démonstration (JAMAIS en production)
 make dev          # serveur → http://localhost:3000
-make check        # vérifie les 11 routes (PASS 200 attendu)
+make check        # purge du cache .next + vérifie les 11 routes (PASS 200 attendu)
+make clean        # purge du cache .next seule (obligatoire après chaque modification de code)
 make reset        # base de démo neuve (volume supprimé + migrate + seed)
 ```
 
