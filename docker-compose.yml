@@ -1,0 +1,97 @@
+# CaisseFlow — développement 100 % conteneurisé (aucun Node/npm sur l'hôte).
+# Démarrage : make up && make migrate && make seed  (voir README.md)
+name: caisseflow
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: caisseflow-postgres
+    environment:
+      POSTGRES_DB: caisseflow
+      POSTGRES_USER: caisseflow
+      POSTGRES_PASSWORD: caisseflow_dev   # dev uniquement — prod via .env.prod
+    ports:
+      - "5433:5432"                        # exposé pour les outils locaux uniquement
+    volumes:
+      - caisseflow_pgdata:/var/lib/postgresql/data
+      - ./infra/backups:/backups
+      - ./infra/scripts:/scripts:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U caisseflow -d caisseflow"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    networks: [caisseflow-net]
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: dev
+    container_name: caisseflow-web
+    environment:
+      DATABASE_URL: postgres://caisseflow:caisseflow_dev@postgres:5432/caisseflow
+      APP_ORIGIN: http://localhost:3000
+      NODE_ENV: development
+    ports:
+      - "3000:3000"
+    volumes:
+      # Hot-reload : le code source est monté, node_modules vit dans son volume.
+      - ./apps/web:/repo/apps/web
+      - ./packages/shared:/repo/packages/shared
+      - ./infra/scripts:/repo/infra/scripts:ro
+      - web_node_modules:/repo/node_modules
+      - web_next_cache:/repo/apps/web/.next
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks: [caisseflow-net]
+    restart: unless-stopped
+
+  # Studio de données : Adminer (le socle data reste en SQL versionné, cf. README).
+  adminer:
+    image: adminer:latest
+    container_name: caisseflow-adminer
+    ports:
+      - "8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [caisseflow-net]
+    restart: unless-stopped
+
+  # SMTP de test (capturer les e-mails de rappel licence, LIC-2).
+  mailhog:
+    image: mailhog/mailhog
+    container_name: caisseflow-mailhog
+    ports:
+      - "8025:8025"   # UI web ; SMTP interne sur 1025 (non publié)
+    networks: [caisseflow-net]
+    restart: unless-stopped
+
+  # Build APK reproductible (exécuté à la demande : make build-apk — jamais up -d).
+  mobile:
+    build:
+      context: .
+      dockerfile: apps/mobile/Dockerfile
+    volumes:
+      - mobile_outputs:/outputs
+    profiles: [apk]   # ne démarre pas avec make up ; lancé par make build-apk
+    networks: [caisseflow-net]
+
+networks:
+  caisseflow-net:      # réseau interne isolé du mono-repo
+    driver: bridge
+
+volumes:
+  caisseflow_pgdata:
+  web_node_modules:
+  web_next_cache:
+  mobile_outputs:

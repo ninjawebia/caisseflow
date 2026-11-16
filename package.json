@@ -1,0 +1,17 @@
+{
+  "name": "caisseflow",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CaisseFlow — POS restaurant conforme NF525 (mono-repo conteneurisé)",
+  "workspaces": [
+    "apps/web",
+    "apps/mobile",
+    "packages/shared"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace @caisseflow/web",
+    "build:web": "npm run build --workspace @caisseflow/web",
+    "migrate": "npm run db:migrate --workspace @caisseflow/web",
+    "seed": "npm run db:seed --workspace @caisseflow/web"
+  }
+}

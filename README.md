@@ -1,0 +1,75 @@
+# CaisseFlow
+
+POS restaurant conforme NF525 — back-office web + applications tablette (mono-repo).
+
+> **Socle 100 % conteneurisé** : aucune installation Node.js/npm n'est requise sur la machine.
+> Tout (dépendances, migrations, seed, tests, build APK) s'exécute dans Docker.
+
+## Démarrage (machine vierge avec Docker Desktop uniquement)
+
+```bash
+git clone https://github.com/ninjawebia/caisseflow.git
+cd caisseflow
+make up        # web + PostgreSQL + adminer + mailhog (réseau caisseflow-net)
+make migrate   # migrations SQL versionnées (ledger idempotent, incl. garde-fous NF525)
+make seed      # données de démo déterministes (PIN 1234/2345/3456/4567 — JAMAIS en prod)
+```
+
+→ Application : **http://localhost:3000** · Adminer : http://localhost:8081 · MailHog : http://localhost:8025
+
+Vérification (depuis les conteneurs, pas depuis l'hôte) : `make smoke`
+(base + migrations + seed + chaînage SHA-256 + HTTP `api/health`).
+
+## Arborescence
+
+```
+apps/web        → back-office Next.js (BO + API) + lib NF525 (lib/fiscal.js, isolé)
+apps/mobile     → app Expo React Native (squelette Phase 2 ; build APK via Docker)
+packages/shared → types NF525 + DTO API partagés (web ↔ mobile)
+infra/          → scripts d'exploitation, Caddy (HTTPS), backups, Dokploy
+```
+
+## Choix socle data (décision PRD ch. 9 conservée)
+
+La persistance reste en **PostgreSQL + SQL versionné** (`apps/web/db/migrations/`, ledger
+`schema_migrations`), exécuté par `make migrate` dans le conteneur — c'est l'alternative
+explicitement prévue pour appliquer les garde-fous NF525 (triggers anti-UPDATE/DELETE sur
+`journal_replica` et `clotures`, migration `0003_nf525_guards.sql`). Prisma n'est pas
+utilisé ; `prisma-studio` est remplacé par **Adminer**. Toute mutation des DTO passe par
+`packages/shared` (une seule définition serveur/client).
+
+## Commandes principales (point d'entrée unique : `make`)
+
+| Commande | Rôle |
+| --- | --- |
+| `make up` / `make down` / `make logs` | Cycle de vie des conteneurs dev |
+| `make migrate` / `make seed` | Base (dans le conteneur web) |
+| `make test` / `make chain-check` / `make healthcheck` | Chaînage NF525 + santé des services |
+| `make smoke` | Test de fumée complet |
+| `make backup` / `make restore FILE=…` | pg_dump horodaté + rotation (14) |
+| `make build-apk` | APK Android reproducible → `apps/mobile/outputs/` |
+| `make shell-web` | Shell dans le conteneur (npm autorisé — dedans seulement) |
+
+## Production / préprod (Dokploy ou compose)
+
+```bash
+cp .env.example .env.prod     # secrets locaux, jamais commité
+docker compose -f docker-compose.prod.yml up -d
+```
+
+Image runtime non-root (Alpine, UID 1000), HEALTHCHECK intégré, PostgreSQL non exposé,
+Caddy pour HTTPS automatique. Variantes : base conteneurisée (défaut) ou managée
+(commenter le service `db`, renseigner `DATABASE_URL`). Portabilité dev → prod par
+variables d'environnement uniquement.
+
+## Sécurité
+
+- Secrets : `.env` local / `.env.prod` / secrets Docker-Dokploy — **jamais commités**.
+- Journal fiscal : append-only garanti au niveau PostgreSQL (triggers), chaînage SHA-256
+  vérifiable par `make chain-check`, conservation 6 ans, export de contrôle fiscal signé.
+- `make seed` refuse de s'exécuter si `NODE_ENV=production` (lead NV-1).
+
+## Crédits
+
+- Protocole d'audit de sécurité adapté de [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) (MIT).
+- Licence : MIT (voir `LICENSE` à la publication publique).

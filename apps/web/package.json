@@ -1,5 +1,5 @@
 {
-  "name": "caisseflow-backoffice",
+  "name": "@caisseflow/web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -8,7 +8,8 @@
     "start": "next start",
     "db:up": "docker compose up -d db",
     "db:migrate": "node db/migrate.js",
-    "db:seed": "node db/seed.js"
+    "db:seed": "node db/seed.js",
+    "test": "node tests/chain-check.js"
   },
   "dependencies": {
     "bcryptjs": "3.0.2",

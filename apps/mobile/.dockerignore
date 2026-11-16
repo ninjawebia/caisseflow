@@ -1,0 +1,7 @@
+node_modules
+android
+outputs
+*.apk
+.env*
+Dockerfile
+.dockerignore

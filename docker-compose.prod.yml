@@ -1,0 +1,72 @@
+# CaisseFlow — préprod / production (image buildée, pas de code source monté).
+# Usage : docker compose -f docker-compose.prod.yml up -d
+# Secrets : .env.prod (jamais commité) ou secrets Docker/Dokploy. Jamais .env de dev.
+#
+# Deux variantes de base de données :
+#   A) PostgreSQL conteneurisé (défaut, ci-dessous) — pilote / petite structure.
+#   B) PostgreSQL managé — commenter le service db et db_backup, et définir
+#      DATABASE_URL dans .env.prod (le reste du socle ne change pas).
+
+name: caisseflow-prod
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: runtime
+    image: caisseflow/web:${TAG:-latest}
+    environment:
+      DATABASE_URL: ${DATABASE_URL}          # .env.prod / secret Dokploy
+      APP_ORIGIN: ${APP_ORIGIN}              # ex. https://caisseflow.example.com
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [caisseflow-net]
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: caisseflow
+      POSTGRES_USER: caisseflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}   # .env.prod uniquement (fort !)
+    volumes:
+      - caisseflow_pgdata_prod:/var/lib/postgresql/data
+      - ./infra/backups:/backups
+      - ./infra/scripts:/scripts:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U caisseflow -d caisseflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [caisseflow-net]
+    restart: unless-stopped
+    # Pas de port publié : PostgreSQL n'est accessible que depuis le réseau interne.
+
+  # HTTPS automatique (certificats Let's Encrypt gérés par Caddy).
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      DOMAIN: ${DOMAIN}                       # ex. caisseflow.example.com
+    depends_on:
+      - web
+    networks: [caisseflow-net]
+    restart: unless-stopped
+
+networks:
+  caisseflow-net:
+    driver: bridge
+
+volumes:
+  caisseflow_pgdata_prod:
+  caddy_data:
+  caddy_config:

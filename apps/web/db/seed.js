@@ -46,6 +46,13 @@ const tables = [
 async function main() {
   const c = await pool.connect();
   try {
+    // Idempotent : un seed déjà appliqué est sauté (le seed est déterministe,
+    // jamais partiel — et jamais exécuté en production, cf. infra/scripts/db-seed.sh).
+    const already = await c.query("SELECT COUNT(*)::int AS n FROM restaurants");
+    if (already.rows[0].n > 0) {
+      console.log("Seed déjà appliqué — skip (idempotent).");
+      return;
+    }
     await c.query("BEGIN");
     const rest = (
       await c.query(

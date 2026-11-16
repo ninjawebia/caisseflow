@@ -1,0 +1,5 @@
+# Caddy — HTTPS automatique (Let's Encrypt) pour CaisseFlow prod/pilote.
+{$DOMAIN} {
+	# Le service web est résolu par le réseau interne compose.
+	reverse_proxy web:3000
+}

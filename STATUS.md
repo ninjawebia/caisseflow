@@ -54,3 +54,15 @@ Anomalies constatées pendant la passe : les 403 initiaux venaient du script de 
 - Reference images: `refs/`
 - Design Blueprint: `design/DESIGN-BLUEPRINT.md`
 - Security artifacts: `security/`
+
+## Refonte du socle — 100 % conteneurisé (2026-11-16)
+
+| Élément | Détail |
+| --- | --- |
+| Règle | Aucun node/npm/npx sur l'hôte — tout via Docker/Compose (règle AGENTS.md skill) |
+| Structure | `apps/web` (ex-`app/`, git mv), `apps/mobile` (squelette Expo + Dockerfile APK), `packages/shared` (@caisseflow/shared : types NF525 + DTO validateurs branchés dans /api/articles), `infra/` (scripts, Caddy, backups) |
+| Images | web : multi-étapes deps→dev→build→runtime, Alpine non-root (node UID 1000), HEALTHCHECK `/api/health` · mobile : JDK17 + Android SDK, volume `/outputs` |
+| Compose | dev : hot-reload + postgres healthy-gated + adminer + mailhog, réseau `caisseflow-net`, volumes nommés · prod : image buildée + Caddy HTTPS, `.env.prod`, 2 variantes DB |
+| Data | SQL versionné conservé (décision PRD 9) ; migrations 0003/0004 : triggers RAISE EXCEPTION sur journal_replica + clotures (remplace les RULES silencieuses de 0001 — preuve observable TC-NF525-010) |
+| Preuve | `docker compose down -v` (machine vierge) → up → migrate (0001…0004) → seed → `make smoke` PASS ; UPDATE/DELETE journal → `ERROR: NF525 …` ; qa 0/0 ; audit 20 PASS |
+| Nettoyage hôte | Proposé à validation : `app/node_modules` (518 M), `app/.next` (50 M), cache npm — non supprimés sans accord |

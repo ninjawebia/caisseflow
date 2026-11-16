@@ -1,0 +1,9 @@
+{
+  "name": "@caisseflow/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Types et schémas partagés : événements NF525, DTO API (web + mobile RN)",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "license": "MIT"
+}

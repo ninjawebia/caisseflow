@@ -1,0 +1,27 @@
+# Build artifacts and dependencies (recreated inside containers)
+**/node_modules
+apps/web/.next
+apps/web/.next/standalone
+apps/web/.next/static
+**/dist
+**/build
+**/.turbo
+
+# Local build outputs (mobile APK goes to mounted volume)
+apps/mobile/outputs
+**/*.apk
+
+# Secrets — never in images
+**/.env
+**/.env.*
+!.env.example
+
+# Git and runtime artifacts
+.git
+**/var/
+infra/backups/*
+!infra/backups/.gitkeep
+
+# OS noise
+.DS_Store
+Thumbs.db
