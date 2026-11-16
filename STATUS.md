@@ -6,10 +6,10 @@ Created: 2026-11-16 00:36
 ## Phases
 
 - [x] Phase 1 — PRD (`prd/PRD-v0.1.md`) — interview A1–A10 complète, PRD approuvé avec amendement module IMP (impression ticket)
-- [x] Phase 2 — UI Design (`design/DESIGN-BLUEPRINT.md`) — blueprint 4 surfaces généré, en attente de confirmation avant Phase 3
-- [ ] Phase 3 — Code (`app/`)
-- [ ] Phase 4 — Local test
-- [ ] Phase 4.5 — Security audit (`security/REPORT.md`)
+- [x] Phase 2 — UI Design (`design/DESIGN-BLUEPRINT.md`) — blueprint 4 surfaces validé par l'utilisateur
+- [x] Phase 3 — Code (`app/`) — 11 modules construits, testés et committés un par un
+- [x] Phase 4 — Local test — 11/11 routes PASS 200 ; `qa-check.sh` 0 FAIL / 0 WARN
+- [x] Phase 4.5 — Security audit (`security/REPORT.md`) — gate PASS : 20 PASS / 0 FAIL / 0 WARN ; 2 needs_validation (déploiement), 7 rejets prouvés, 0 confirmé
 - [ ] Phase 5 — Handoff (`HANDOFF.md`)
 
 ## Modules
@@ -22,6 +22,7 @@ Commit: `bash scripts/git-save.sh pos-nf525 "<message>"`
 | --- | --- | --- | --- | --- | --- |
 | 1 | Fondations + Auth | `/login` + `/api/auth/login|logout` | `test-local --check --path /login` → PASS 200 ; `/` → 307 ; migrations + seed OK (22 écritures chaînées SHA-256, 2 clôtures Z, 4 comptes web, 4 matricules) | 9252c96 | [x] |
 | 2 | Dashboard | `/dashboard` | `test-local --check --path /dashboard` → PASS 200 ; KPI + TVA multi-taux + barres 7 jours + dernières écritures | 675ccc5 | [x] |
+| 3 | Menu & TVA | `/menu` + `/api/articles` | `test-local --check --path /menu` → PASS 200 ; CRUD articles avec validation serveur + audit | a30bdd5 | [x] |
 | 4 | Utilisateurs & droits | `/utilisateurs` + `/api/users-*` | `test-local --check --path /utilisateurs` → PASS 200 ; PIN bcrypt, blocage 5 échecs, audit | c661de8 | [x] |
 | 5 | Tables & salles | `/tables` + `/api/tables` | `test-local --check --path /tables` → PASS 200 ; CRUD, désactivation tracée | 4ada793 | [x] |
 | 6 | Journal NF525 + Sync | `/journal` + `/api/sync/push|pull` + `/api/licence/status` | PASS 200 ; push #1 accepted:1 chainVerified:true ; push #2 (UUID identique) duplicates:1 — idempotence T-SYNC-03 ; push #3 chaînage invalide → rejected:1 chainVerified:false ; sans jeton → 401 | 7439f8b | [x] |
