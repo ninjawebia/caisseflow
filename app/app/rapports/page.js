@@ -54,7 +54,7 @@ export default async function ReportsPage({ searchParams }) {
                 <tbody>
                   {data.byDay.map((r) => (
                     <tr key={r.day} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
-                      <td className="py-2 pr-4">{r.day}</td>
+                      <td className="py-2 pr-4">{frDate(r.day)}</td>
                       <td className="py-2 pr-4 text-right font-mono tabular-nums">{r.nb}</td>
                       <td className="py-2 text-right font-mono tabular-nums font-medium">{Number(r.total).toFixed(2)} €</td>
                     </tr>
@@ -117,11 +117,15 @@ export default async function ReportsPage({ searchParams }) {
   );
 }
 
+function frDate(iso) {
+  return typeof iso === "string" && /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso.split("-").reverse().join("/") : String(iso ?? "—");
+}
+
 async function load(restaurantId, from, to) {
   const range = `"timestamp" >= $2::date AND "timestamp" < ($3::date + interval '1 day')`;
 
   const byDay = await pool.query(
-    `SELECT "timestamp"::date AS day, COUNT(*) AS nb, SUM((payload->>'montant')::numeric) AS total
+    `SELECT to_char("timestamp"::date, 'YYYY-MM-DD') AS day, COUNT(*) AS nb, SUM((payload->>'montant')::numeric) AS total
      FROM journal_replica WHERE restaurant_id=$1 AND type='PAIEMENT' AND ${range}
      GROUP BY 1 ORDER BY 1`, [restaurantId, from, to]
   );

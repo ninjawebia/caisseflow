@@ -1,4 +1,7 @@
-/* Base styles — layout tokens come from Tailwind CDN (see layout.js).
+/* Tailwind compilé localement (aucun CDN externe — styles servis par l'app). */
+@import "tailwindcss";
+
+/* Base styles — layout tokens come from Tailwind (compiled via PostCSS).
    Light mode only by project rule (PRD chapter 15). */
 main {
   min-height: 100vh;

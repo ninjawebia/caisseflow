@@ -1,5 +1,4 @@
 import "./globals.css";
-import Script from "next/script";
 
 export const metadata = {
   title: "CaisseFlow — Back-office",
@@ -10,9 +9,6 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="fr">
-      <head>
-        <Script src="https://cdn.tailwindcss.com" strategy="afterInteractive" />
-      </head>
       <body className="bg-slate-50 text-slate-900 antialiased">{children}</body>
     </html>
   );

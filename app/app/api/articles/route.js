@@ -30,7 +30,8 @@ export async function POST(req) {
     const r = await pool.query(
       `INSERT INTO articles (restaurant_id, categorie_id, nom, prix_ttc, taux_tva, actif)
        VALUES ($1,$2,$3,$4,$5,$6)
-       RETURNING id, nom, prix_ttc, taux_tva, actif, categorie_id`,
+       RETURNING id, nom, prix_ttc, taux_tva, actif, categorie_id,
+                 (SELECT c.nom FROM categories c WHERE c.id = articles.categorie_id) AS categorie_nom`,
       [user.restaurantId, cat, nom, prix, tva, actif]
     );
     const article = { ...r.rows[0], prix_ttc: Number(r.rows[0].prix_ttc), taux_tva: Number(r.rows[0].taux_tva) };

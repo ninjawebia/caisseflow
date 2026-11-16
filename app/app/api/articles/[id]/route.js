@@ -36,7 +36,8 @@ export async function PATCH(req, ctx) {
        SET nom=$1, prix_ttc=$2, taux_tva=$3, categorie_id=$4, actif=$5,
            version = version + $6, updated_at = now()
        WHERE id=$7 AND restaurant_id=$8
-       RETURNING id, nom, prix_ttc, taux_tva, actif, categorie_id`,
+       RETURNING id, nom, prix_ttc, taux_tva, actif, categorie_id,
+                 (SELECT c.nom FROM categories c WHERE c.id = articles.categorie_id) AS categorie_nom`,
       [nom, prix, tva, cat, actif, bump, id, user.restaurantId]
     );
     const article = { ...r.rows[0], prix_ttc: Number(r.rows[0].prix_ttc), taux_tva: Number(r.rows[0].taux_tva) };

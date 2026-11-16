@@ -139,7 +139,7 @@ async function loadData(restaurantId) {
 
   // Aggregate payments of the last 7 days from journal_replica payloads.
   const pay = await pool.query(
-    `SELECT "timestamp"::date AS day,
+    `SELECT to_char("timestamp"::date, 'YYYY-MM-DD') AS day,
             SUM((payload->>'montant')::numeric) AS total, COUNT(*) AS nb
      FROM journal_replica
      WHERE restaurant_id=$1 AND type='PAIEMENT' AND "timestamp" >= now() - interval '7 days'
@@ -148,11 +148,13 @@ async function loadData(restaurantId) {
   );
   const todayPay = pay.rows.find((r) => String(r.day) === new Date().toISOString().slice(0, 10)) || { total: 0, nb: 0 };
 
+  // TVA per rate for today — set-returning jsonb_object_keys must live in a
+  // LATERAL item (a SRF inside an aggregate call is rejected by PostgreSQL).
   const tva = await pool.query(
-    `SELECT jsonb_object_keys(payload->'tva') AS taux,
-            SUM((payload->'tva'->>jsonb_object_keys(payload->'tva'))::numeric) AS montant
-     FROM journal_replica
-     WHERE restaurant_id=$1 AND type='PAIEMENT' AND "timestamp"::date = now()::date
+    `SELECT k.taux, SUM((j.payload->'tva'->>k.taux)::numeric) AS montant
+     FROM journal_replica j
+     CROSS JOIN LATERAL jsonb_object_keys(j.payload->'tva') AS k(taux)
+     WHERE j.restaurant_id=$1 AND j.type='PAIEMENT' AND j."timestamp"::date = now()::date
      GROUP BY 1`,
     [restaurantId]
   );
