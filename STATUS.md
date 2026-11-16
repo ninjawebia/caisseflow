@@ -20,7 +20,7 @@ Commit: `bash scripts/git-save.sh pos-nf525 "<message>"`
 
 | # | Module | Screen / route | Test evidence | Commit | Done |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Fondations + Auth | `/login` + `/api/auth/login|logout` | `test-local --check --path /login` → PASS 200 ; `/` → 307 ; migrations + seed OK (22 écritures chaînées SHA-256, 2 clôtures Z, 4 comptes web, 4 matricules) | (commit M1) | [x] |
+| 1 | Fondations + Auth | `/login` + `/api/auth/login|logout` | `test-local --check --path /login` → PASS 200 ; `/` → 307 ; migrations + seed OK (22 écritures chaînées SHA-256, 2 clôtures Z, 4 comptes web, 4 matricules) | 9252c96 | [x] |
 
 ## Notes
 

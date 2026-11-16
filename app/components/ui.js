@@ -71,7 +71,8 @@ export function KpiCard({ label, value, hint, tone = "neutral" }) {
 
 // Rendered by protected pages when no valid session exists (PRD 4-state:
 // unauthenticated state served with HTTP 200 + explicit call to action).
-export function LoginRequired() {
+// Variante "denied" pour les accès RBAC refusés (PRD 3.2 → 403).
+export function LoginRequired({ denied = false }) {
   return (
     <Card className="p-10 max-w-lg mx-auto mt-16 text-center">
       <div className="bg-slate-100 rounded-full p-6 mb-4 inline-flex" aria-hidden="true">
@@ -79,8 +80,10 @@ export function LoginRequired() {
           <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
         </svg>
       </div>
-      <h2 className="text-lg font-semibold text-slate-900">Session requise</h2>
-      <p className="text-sm text-slate-500 mt-1">Connectez-vous au back-office pour accéder à cette page.</p>
+      <h2 className="text-lg font-semibold text-slate-900">{denied ? "Accès refusé (403)" : "Session requise"}</h2>
+      <p className="text-sm text-slate-500 mt-1">
+        {denied ? "Votre profil n'a pas les droits nécessaires pour cette page." : "Connectez-vous au back-office pour accéder à cette page."}
+      </p>
       <a href="/login" className="mt-4 inline-flex h-10 px-4 items-center justify-center bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-medium rounded-lg transition-[transform,colors] duration-150">Aller à la connexion</a>
     </Card>
   );
