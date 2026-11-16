@@ -1,0 +1,4 @@
+Preuve SEC — injection SQL via /journal?q (GET hostile)
+Requête: GET /journal?q=x'; DROP TABLE journal_replica;--&type=VENTE (session gérant)
+Observé: HTTP 200 (état vide rendu), journal_replica intact (23 lignes après la requête)
+Contrôle: requête 100% paramétrée (ILIKE $n), aucune concaténation de valeur utilisateur

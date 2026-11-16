@@ -2,7 +2,7 @@
 // Deterministic demo seed (PRD 13.2). Run: npm run db:seed
 // Demo credentials are hashed at insert time (bcrypt) — see HANDOFF for values.
 const path = require("path");
-require("dotenv").config({ path: path.join(__dirname, "..", "..", ".env") });
+require("dotenv").config({ path: path.resolve(process.cwd(), "..", ".env"), quiet: true });
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const { pool } = require("../lib/db");

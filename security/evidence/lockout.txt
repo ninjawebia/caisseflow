@@ -1,0 +1,8 @@
+tentative 1 → HTTP 401
+tentative 2 → HTTP 401
+tentative 3 → HTTP 401
+tentative 4 → HTTP 401
+tentative 5 → HTTP 401
+tentative 6 → HTTP 423
+— login correct après 5 échecs (attendu 423):
+login correct → HTTP 423
