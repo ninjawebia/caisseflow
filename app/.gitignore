@@ -1,9 +1,8 @@
-.env
-.env.*
-!.env.example
-.dev.vars
-.wrangler/
 node_modules/
-dist/
-.dart_tool/
-build/
+.next/
+.env
+.env.local
+.dev.vars
+*.pem
+*.key
+pgdata/

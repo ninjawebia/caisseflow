@@ -1,0 +1,5 @@
+/* Base styles — layout tokens come from Tailwind CDN (see layout.js).
+   Light mode only by project rule (PRD chapter 15). */
+main {
+  min-height: 100vh;
+}

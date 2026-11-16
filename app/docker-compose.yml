@@ -1,0 +1,20 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: caisseflow-db
+    environment:
+      POSTGRES_DB: caisseflow
+      POSTGRES_USER: caisseflow
+      POSTGRES_PASSWORD: caisseflow_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - caisseflow_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U caisseflow"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  caisseflow_pgdata:
