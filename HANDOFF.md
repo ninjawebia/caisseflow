@@ -2,13 +2,13 @@
 
 Date : 2026-11-16
 Version : 0.1.0 (pilote)
-Dossier : `projects/pos-nf525/`
+Dossier : `projects/CaisseFlow/`
 
 ## 1. URL
 
 | Environnement | URL | État |
 | --- | --- | --- |
-| Local (testé) | `http://localhost:4173` via `bash scripts/test-local.sh pos-nf525` | opérationnel, 11/11 routes PASS |
+| Local (testé) | `http://localhost:4173` via `bash scripts/test-local.sh CaisseFlow` | opérationnel, 11/11 routes PASS |
 | Production | **non déployée — déploiement soumis à votre autorisation séparée** | — |
 
 ## 2. Comptes (démonstration locale — à désactiver en production)
@@ -50,7 +50,7 @@ Aucune valeur secrète dans ce document, le dépôt ou les logs.
 Via le **Makefile** (recommandé) :
 
 ```bash
-cd projects/pos-nf525
+cd projects/CaisseFlow
 make install      # dépendances (première fois)
 make migrate      # PostgreSQL Docker + migrations idempotentes
 make seed         # données de démonstration (JAMAIS en production)
@@ -63,12 +63,12 @@ make reset        # base de démo neuve (volume supprimé + migrate + seed)
 Équivalent manuel :
 
 ```bash
-cd projects/pos-nf525/app
+cd projects/CaisseFlow/app
 docker compose up -d db          # PostgreSQL 16 (port 5433)
 npm install
 npm run db:migrate               # migrations idempotentes (ledger schema_migrations)
 npm run db:seed                  # DÉMO UNIQUEMENT — jamais en production
-cd ../.. && bash scripts/test-local.sh pos-nf525 --check --path /login --path /dashboard
+cd ../.. && bash scripts/test-local.sh CaisseFlow --check --path /login --path /dashboard
 ```
 
 ## 6. Redéploiement (stack G — Next.js + PostgreSQL)
@@ -83,7 +83,7 @@ Voir `workflow/05-handoff.md` §3 pour les alternatives.
 | Élément | Sauvegarde | Rollback |
 | --- | --- | --- |
 | Données | `pg_dump` quotidien (exigence 6 ans pour les données fiscales — PG 13.4) | restauration du dump sur instance neuve |
-| Code | historique git local (`projects/pos-nf525/.git`, un commit par module) | redeploy du commit précédent |
+| Code | historique git local (`projects/CaisseFlow/.git`, un commit par module) | redeploy du commit précédent |
 | Déploiement | historique Vercel/image Docker | promotion de l'ancienne version |
 
 ## 8. Tests par module (preuves réelles, voir STATUS.md pour le détail)
@@ -137,7 +137,7 @@ Voir `workflow/05-handoff.md` §3 pour les alternatives.
 
 ## 11. Références
 
-- PRD : `projects/pos-nf525/prd/PRD-v0.1.md` (contrat fonctionnel, 17 chapitres)
-- Design : `projects/pos-nf525/design/DESIGN-BLUEPRINT.md` (+ `refs/`)
-- Sécurité : `projects/pos-nf525/security/` (THREAT-MODEL, REPORT, findings.json, evidence/)
-- Statut détaillé : `projects/pos-nf525/STATUS.md`
+- PRD : `projects/CaisseFlow/prd/PRD-v0.1.md` (contrat fonctionnel, 17 chapitres)
+- Design : `projects/CaisseFlow/design/DESIGN-BLUEPRINT.md` (+ `refs/`)
+- Sécurité : `projects/CaisseFlow/security/` (THREAT-MODEL, REPORT, findings.json, evidence/)
+- Statut détaillé : `projects/CaisseFlow/STATUS.md`

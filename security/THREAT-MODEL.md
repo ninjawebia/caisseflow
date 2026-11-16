@@ -1,4 +1,4 @@
-# Modèle de menace — CaisseFlow (`pos-nf525`)
+# Modèle de menace — CaisseFlow (`CaisseFlow`)
 
 Source de vérité : `prd/PRD-v0.1.md` (chapitres 9 modèle de données, 10 exigences
 non fonctionnelles, 12 écrans). Cible : `app/` uniquement, environnement local,

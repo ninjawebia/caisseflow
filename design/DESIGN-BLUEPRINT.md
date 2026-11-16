@@ -1,4 +1,4 @@
-# Design System Blueprint — pos-nf525 (CaisseFlow)
+# Design System Blueprint — CaisseFlow (CaisseFlow)
 
 A detailed UI/UX design specification. No reference images were supplied (PRD A9 = A): this blueprint **proposes** the visual direction, adapted to the four surfaces of CaisseFlow. It serves as the visual contract and direct implementation guide for Phase 3 Codegen.
 

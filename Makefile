@@ -1,4 +1,4 @@
-# Makefile — CaisseFlow (pos-nf525)
+# Makefile — CaisseFlow (CaisseFlow)
 # Utilisation : make help
 # RÈGLE : après chaque modification de code, purger le cache .next (make clean)
 # puis relancer les tests (make check / qa / audit) — le cache dev de Next.js
@@ -31,7 +31,7 @@ help:
 
 info:
 	@echo "================ CaisseFlow — POS restaurant conforme NF525 ================"
-	@echo "Application : CaisseFlow (dossier projet pos-nf525, v0.1.0 pilote)"
+	@echo "Application : CaisseFlow (dossier projet CaisseFlow, v0.1.0 pilote)"
 	@echo "Hôte:port   : http://localhost:$(PORT)   (dev : make dev)"
 	@echo "Base        : PostgreSQL Docker 'caisseflow-db' — localhost:5433 (caisseflow)"
 	@echo ""
@@ -76,7 +76,7 @@ clean:
 stop:
 	@for p in $$(ss -tlnp 2>/dev/null | grep -oE 'pid=[0-9]+' | cut -d= -f2 | sort -u); do \
 	  cwd=$$(readlink /proc/$$p/cwd 2>/dev/null); \
-	  case "$$cwd" in */pos-nf525/*) \
+	  case "$$cwd" in */CaisseFlow/*) \
 	    cmd=$$(tr '\0' ' ' < /proc/$$p/cmdline 2>/dev/null); \
 	    case "$$cmd" in *next*) echo "arrêt du serveur dev (pid $$p, $$cwd)"; kill $$p;; esac ;; \
 	  esac; \
@@ -111,7 +111,7 @@ reset: db-reset migrate seed
 # + vérification HTTP de chaque route.
 check: stop clean
 	@if [ -f "$(HARNESS)" ]; then \
-	  bash $(HARNESS) pos-nf525 --check $(addprefix --path ,$(ROUTES)); \
+	  bash $(HARNESS) CaisseFlow --check $(addprefix --path ,$(ROUTES)); \
 	else \
 	  cd $(APP) && npx next dev -p $(PORT) > /tmp/caisseflow-check.log 2>&1 & pid=$$!; \
 	  sleep 8; \

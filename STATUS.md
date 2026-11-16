@@ -1,4 +1,4 @@
-# STATUS — pos-nf525
+# STATUS — CaisseFlow
 
 Stack: `F` — Hybride : backend Next.js + PostgreSQL + Prisma (Docker/Dokploy) + apps React Native (tablette caisse NF525 + terminaux de salle)
 Created: 2026-11-16 00:36
@@ -15,8 +15,8 @@ Created: 2026-11-16 00:36
 ## Modules
 
 Build one module, test it, commit it, then start the next one.
-Test: `bash scripts/test-local.sh pos-nf525 --check --path <route>`
-Commit: `bash scripts/git-save.sh pos-nf525 "<message>"`
+Test: `bash scripts/test-local.sh CaisseFlow --check --path <route>`
+Commit: `bash scripts/git-save.sh CaisseFlow "<message>"`
 
 | # | Module | Screen / route | Test evidence | Commit | Done |
 | --- | --- | --- | --- | --- | --- |

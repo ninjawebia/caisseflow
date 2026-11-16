@@ -1,6 +1,6 @@
-# Rapport d'audit de sécurité — CaisseFlow (`pos-nf525`)
+# Rapport d'audit de sécurité — CaisseFlow (`CaisseFlow`)
 
-Date : 2026-11-16 · Périmètre : `projects/pos-nf525/app` en local ·
+Date : 2026-11-16 · Périmètre : `projects/CaisseFlow/app` en local ·
 Comptes : fictifs (seed) · Production : jamais contactée.
 
 ## 1. Posture

@@ -9,7 +9,7 @@
 | **Prepared by** | Agent IA (Product Manager / Solution Architect) |
 | **For / Stakeholder** | Client CaisseFlow (1 restaurant pilote année 1) |
 | **Date** | 2026-11-16 |
-| **Project Folder** | `projects/pos-nf525/` |
+| **Project Folder** | `projects/CaisseFlow/` |
 | **Target Technology** | Hybride (F) : Backend Next.js + PostgreSQL + Prisma (Docker/VPS) + Applications React Native (tablette caisse + terminaux) |
 | **Related Documents** | `DESIGN-BLUEPRINT.md`, `STATUS.md`, `THREAT-MODEL.md` |
 
@@ -798,7 +798,7 @@ CREATE INDEX idx_journal_type ON journal_replica (restaurant_id, type);
 | Item | Specification |
 | --- | --- |
 | **Fidelity Mode** | `Mood-only` (aucune référence fournie — direction proposée par l'agent, A9 = A) |
-| **Reference Files** | `projects/pos-nf525/refs/` (vide à ce stade) |
+| **Reference Files** | `projects/CaisseFlow/refs/` (vide à ce stade) |
 | **Target Device Orientation** | Tablette caisse/terminaux: Android paysage 1280×800 (fixe). Back-office: Desktop master 1440px, responsive 360→1920px |
 | **Extracted Elements** | — |
 | **Replaced / Localized Elements** | Langue: français ; monnaie: EUR ; mentions légales NF525 sur tickets |
@@ -893,11 +893,11 @@ CREATE INDEX idx_journal_type ON journal_replica (restaurant_id, type);
 
 ### 13.1 Local Commands & Quality Verification
 ```bash
-bash scripts/test-local.sh pos-nf525 --check          # backend web + API
-bash scripts/qa-check.sh pos-nf525
-bash scripts/security-audit.sh pos-nf525
+bash scripts/test-local.sh CaisseFlow --check          # backend web + API
+bash scripts/qa-check.sh CaisseFlow
+bash scripts/security-audit.sh CaisseFlow
 # Mobile (local): build + tests unitaires RN + tests d'intégration SQLite/journal
-cd projects/pos-nf525/app/mobile && npm run test
+cd projects/CaisseFlow/app/mobile && npm run test
 ```
 
 ### 13.2 Deterministic Demo Accounts & Test Seed Matrix

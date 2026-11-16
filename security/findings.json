@@ -1,5 +1,5 @@
 {
-  "target": "projects/pos-nf525",
+  "target": "projects/CaisseFlow",
   "date": "2026-11-16",
   "scope": "app/ en local uniquement, comptes fictifs du seed",
   "records": [
