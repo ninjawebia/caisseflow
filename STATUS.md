@@ -5,7 +5,7 @@ Created: 2026-11-16 00:36
 
 ## Phases
 
-- [x] Phase 1 — PRD (`prd/PRD-v0.1.md`) — interview A1–A10 complète, PRD v0.1 généré, en attente d'approbation
+- [x] Phase 1 — PRD (`prd/PRD-v0.1.md`) — interview A1–A10 complète, PRD approuvé avec amendement module IMP (impression ticket)
 - [ ] Phase 2 — UI Design (`design/DESIGN-BLUEPRINT.md`)
 - [ ] Phase 3 — Code (`app/`)
 - [ ] Phase 4 — Local test

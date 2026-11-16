@@ -1,6 +1,6 @@
 # PRODUCT REQUIREMENTS DOCUMENT — CaisseFlow
 
-**STATUS: Provisional Draft — Pending User Approval**
+**STATUS: Approved — Base for V1 Development (amendment IMP integrated)**
 
 | Metadata Item | Specification |
 | --- | --- |
@@ -153,7 +153,7 @@ Valeur centrale : **un seul poste fiscal, inaltérable, indépendant du réseau*
 - [ASSUMPTION] **WatermelonDB** est retenu comme couche SQLite locale sur la tablette caisse (préféré à Realm : maturité React Native, base SQLite standard, pipeline de synchronisation éprouvé, indexation performante sur journal volumineux). Décision technique laissée à l'agent par le client.
 - [ASSUMPTION] Le couplage terminal→tablette en réseau local utilise un **serveur HTTP/WebSocket embarqué** dans l'app caisse (découverte par mDNS ou IP fixe du restaurant, authentification par jeton de terminal provisionné au moment de l'installation). Protocole exact finalisé à la conception technique.
 - [ASSUMPTION] Les paiements carte sont opérés sur un **TPE externe** (banque, contrat du restaurant) ; CaisseFlow enregistre le montant, le moyen et le résultat. Une intégration TPE directe reste une piste Phase 2/3 (voir 16).
-- [ASSUMPTION] Impression via **imprimante thermique ESC/POS** (Bluetooth ou USB) connectée à la tablette caisse ; modèle cible à confirmer.
+- [ASSUMPTION] Impression **ESC/POS directe depuis React Native** (sans pilote OS) : Bluetooth (portables), USB OTG (tablette caisse), TCP/IP :9100 (cuisine/installations fixes), découverte mDNS — voir module IMP (7.9) ; modèles cibles proposés en section 16.
 - [ASSUMPTION] Les scellés de clôture (Z) sont signés avec une **clé asymétrique générée sur l'appareil** (Android Keystore) ; la clé publique est enregistrée au cloud au provisioning ; le serveur vérifie la signature à l'archivage.
 - [ASSUMPTION] Archives fiscales : format **JSON canonique signé + PDF/CSV lisibles**, conservés en stockage objet sur le VPS avec stratégie de rétention 6 ans (aucune purge avant échéance).
 - [ASSUMPTION] Un restaurant = un préfixe de poste ; pilote à 1 tablette caisse ⇒ `POSTE-01` seul, mais le mécanisme multi-postes (`POSTE-02`, …) est implémenté et testé.
@@ -452,6 +452,42 @@ Valeur centrale : **un seul poste fiscal, inaltérable, indépendant du réseau*
 | **SEC-6** | Verrouillage après 5 échecs de PIN, tentatives journalisées | **Mandatory** | Déblocage par le gérant |
 | **SEC-7** | Rate limiting : auth API (web) ≤ 60 req/min/IP ; endpoints sensibles (login, export) plus stricts | **Mandatory** | Voir 10.2 |
 
+### 7.9 Module: IMP — Impression ticket (applications mobiles)
+
+**User Story:** En tant que gérant, je veux que chaque poste (caisse, serveur, cuisine) imprime ses tickets sur l'imprimante de mon choix, sans que la moindre panne d'imprimante ne bloque l'encaissement ni la conformité.
+
+#### Capabilities & Functional Matrix
+| ID | Requirement Description | Priority | Business Logic & Rules |
+| --- | --- | --- | --- |
+| **IMP-1** | Modes de connexion V1 : **Bluetooth** (ESC/POS portables : Xprinter, Star, Epson TM-P, Goojprt), **USB OTG** (tablette caisse fixe), **réseau local TCP/IP port 9100** (imprimantes de cuisine et installations fixes), **Wi-Fi direct/mDNS** pour la découverte automatique des imprimantes réseau | **Mandatory** | Communication directe ESC/POS depuis React Native — aucun pilote OS ni service d'impression Android |
+| **IMP-2** | Configuration par poste : chaque appareil peut avoir sa propre imprimante associée (ou plusieurs : ticket client + ticket cuisine) | **Mandatory** | Écran de configuration dédié en back-office et sur l'appareil (réservé gérant/admin) : découverte, appairage BT, saisie IP/port, **test d'impression** ; configuration stockée localement et synchronisée via le backend pour réapplication en cas de remplacement d'appareil |
+| **IMP-3** | File d'impression locale persistante (SQLite) : imprimante hors ligne ⇒ tickets en attente, réimprimés au retour de la connexion | **Mandatory** | L'impression **ne conditionne jamais l'écriture fiscale** : le ticket est écrit dans le journal **avant** d'être envoyé à l'imprimante ; une imprimante en panne ne bloque ni l'encaissement ni NF525 |
+| **IMP-4** | Statuts d'impression journalisés : envoyé, imprimé, échec, réimprimé ; réimpression manuelle journalisée (utilisateur, motif, horodatage) | **Mandatory** | Événements IMPRESSION répliqués vers le cloud comme tout événement fiscal |
+| **IMP-5** | Contenu du ticket (mentions légales NF525) : numérotation continue (`POSTE-01-000123`), date/heure, identité du restaurant (nom, adresse, SIRET), détail des articles, TVA par taux, total, mode de paiement, matricule du caissier, hash (empreinte courte) de vérification | **Mandatory** | Modèle configurable en back-office (logo, mentions complémentaires) mais **champs légaux non modifiables** |
+| **IMP-6** | Double ticket (client + cuisine) : une seule commande, **deux files d'impression distinctes** | Important | Chaque file a son imprimante et son état indépendants |
+| **IMP-7** | Rendu, pas source : le ticket imprimé n'est pas le journal fiscal — le journal reste la source de vérité (append-only, chaîné) ; toute impression/réimpression est un événement journalisé localement et répliqué | **Mandatory** | Cohérent avec FISC-1 (événement TICKET) |
+
+#### Input Validation Matrix
+| Field Name | Type | Required | Validation Constraints | Error Message |
+| --- | --- | --- | --- | --- |
+| `ip:port` | text | Mode réseau | IPv4/IPv6 valide + port 1–65535 (par défaut 9100) | "Adresse d'imprimante invalide" |
+| `modele_ticket` | json | Oui (back-office) | Champs légaux non masquables/modifiables | "Champ légal obligatoire" |
+
+#### Acceptance Criteria (Given-When-Then)
+- **Scenario 1 (Impression offline Bluetooth):**
+  - **Given** la tablette caisse en mode avion, imprimante Bluetooth appairée
+  - **When** un encaissement est validé
+  - **Then** l'écriture fiscale est enregistrée d'abord, le ticket s'imprime, l'événement IMPRESSION est journalisé.
+- **Scenario 2 (Imprimante en panne — résilience):**
+  - **Given** une imprimante débranchée, encaissement en cours
+  - **When** le paiement est validé
+  - **Then** l'écriture fiscale est tout de même enregistrée, la file d'impression conserve le ticket, et le ticket s'imprime **automatiquement** au rebranchement ; le statut d'impression (échec puis imprimé) est journalisé.
+
+#### Edge Cases & Failure Handling
+- Imprimante réseau perdue au changement d'IP (DHCP) : découverte mDNS re-propose l'imprimante ; test d'impression obligatoire pour réassocier.
+- Ticket tronqué (papier manquant) : détection échec → mise en file complète, jamais de réimpression partielle silencieuse.
+- Deux imprimantes en échec simultané : la commande reste encaissée ; alerte permanente « N tickets en attente d'impression ».
+
 ---
 
 ## 8. Main User Flows & State Machines
@@ -749,7 +785,7 @@ CREATE INDEX idx_journal_type ON journal_replica (restaurant_id, type);
 | External Service | Category / Function | Integration Method | Auth / Credentials | Fallback Strategy if Unavailable |
 | --- | --- | --- | --- | --- |
 | **TPE (terminal de paiement bancaire)** | Paiement carte | Terminal externe, hors intégration v0.1 ; montant + résultat enregistrés | N/A (contrat banque du restaurant) | Encaissement espèces / report ; saisie manuelle résultat journalisée |
-| **Imprimante ESC/POS (Bluetooth/USB)** | Ticket de caisse | Impression directe depuis la tablette | Appairage local | File d'impression + réimpression journalisée |
+| **Imprimantes ESC/POS** | Ticket de caisse / ticket cuisine | Impression directe depuis React Native — Bluetooth, USB OTG, TCP/IP :9100, découverte mDNS (module IMP 7.9) | Appairage local / IP+port | File d'impression persistante + réimpression auto au retour ; journal écrit **avant** l'envoi à l'imprimante |
 | **SMTP (ex. serveur du VPS / Mailjet)** | Invitations, 2FA par e-mail, rappels licence | REST/API SMTP | `SMTP_URL` (server secret) | File + retry ; rappels non bloquants |
 | **NTP / horloge serveur** | Contrôle d'horloge (FISC-4) | Comparaison au premier contact serveur | N/A | Sans réseau : garde monotone locale seule |
 | **Supervision (logs/alertes)** | Exploitation | Logs Docker + agent d'alerte sur le VPS | Server secret | Alertes locales + e-mail |
@@ -808,6 +844,7 @@ CREATE INDEX idx_journal_type ON journal_replica (restaurant_id, type);
 | `C-06` | Clôture Z | `/cloture` | Gérant, Second | Totaux par TVA, contrôle caisse, scellé, export | Default ; skeleton totaux ; Empty (aucune vente → Z à 0 autorisée) ; Error (Z déjà faite) |
 | `C-07` | Journal local (lecture) | `/journal` | Gérant, Second | Recherche seq/référence, vue écritures, indicateur chaînage | Default ; skeleton lignes ; Empty (aucune écriture) ; Error (rupture chaînage → incident bloquant) |
 | `C-08` | Admin kiosque | `/admin` | Gérant (code admin) | Sortie kiosque, sync forcé, extrusion données, version | Default ; — ; Empty (—) ; Error (code invalide) |
+| `C-09` | Configuration imprimantes | `/imprimantes` | Gérant, Second | Découverte (BT/mDNS), USB, IP:port, test d'impression, files en attente, modèle de ticket | Default ; skeleton découverte ; Empty (aucune imprimante → CTA ajout) ; Error (test d'impression échoué) |
 
 **Surface B — Terminaux serveurs (paysage 1280×800):**
 | Screen ID | Screen Name | Route | Access Role | Main Components | 4 States |
@@ -835,6 +872,7 @@ CREATE INDEX idx_journal_type ON journal_replica (restaurant_id, type);
 | `S-08` | Exports & archives | `/exports` | Comptable, Auditeur, Gérant | Sélection période/format, historique exports, scellés | Default ; skeleton ; Empty ; Error (échec export) |
 | `S-09` | Licence | `/licence` | Gérant, Admin | État, échéances, historique dégradation | Default ; skeleton ; Empty ; Error |
 | `S-10` | Audit logs | `/audit` | Gérant, Comptable, Auditeur, Admin | Table append-only, filtres | Default ; skeleton ; Empty ; Error |
+| `S-11` | Modèle de ticket | `/ticket-modele` | Gérant | Éditeur de modèle (logo, mentions), aperçu, champs légaux verrouillés | Default ; skeleton aperçu ; Empty (modèle par défaut) ; Error (aperçu impossible) |
 
 ### 12.5 Interactive Components & Micro-interactions
 - **Buttons (6 states) — caisse:** hauteur 64px, `rounded-lg`, primary `bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-semibold text-lg` ; secondary contour ; destructive `bg-rose-600` (annulations) toujours avec confirmation par PIN/motif.
@@ -904,14 +942,16 @@ cd projects/pos-nf525/app/mobile && npm run test
 | `T-OPS-05` | §26 | Impayé J+60 | Lancement bloqué, données exportables |
 | `T-TERR-01` | §27 | Service complet réel (pilote) | Commande→cuisine→encaissement→annulation→clôture |
 | `T-TERR-02` | §28 | Usage à une main, debout | Test serveur en conditions réelles |
+| `T-IMP-01` | §1 (amendement) | Mode avion + imprimante Bluetooth appairée | Écriture journal d'abord, ticket imprimé, IMPRESSION journalisé |
+| `T-IMP-02` | Résilience (amendement) | Imprimante débranchée pendant encaissement | Écriture fiscale enregistrée, file conserve le ticket, impression auto au rebranchement, statuts journalisés |
 | `T-GEN-01` | Auth back-office | Connexion valide / invalide | Redirect dashboard / erreur 401 |
 | `T-GEN-02` | RBAC web | Serveur→écran admin | 403 |
 | `T-GEN-03` | Responsive | 360×844 | Bottom nav, zéro scroll horizontal racine |
 
 ### 13.4 Strict Definition of Done Checklist
 - [ ] Tous les écrans du 12.4 s'ouvrent sans erreur console.
-- [ ] Toute exigence **Mandatory** du 7 vérifiée fonctionnellement.
-- [ ] A10 : points **1–12, 18–21, 27 validés sans anomalie** ⇒ mise en production autorisée ; échec sur 1–7 ou 8–10 ⇒ non conforme, pas de mise en production.
+- [ ] Toute exigence **Mandatory** du 7 vérifiée fonctionnellement (y compris module IMP 7.9 : T-IMP-01, T-IMP-02).
+- [ ] A10 (amendée) : points **1–12, 18–21, 27** + test d'impression offline/de l'amendement IMP validés sans anomalie ⇒ mise en production autorisée ; échec sur 1–7 ou 8–10 ⇒ non conforme, pas de mise en production.
 - [ ] Responsive 360/768/1024/1440px zéro scroll horizontal racine (back-office) ; POS 1280×800 vérifié.
 - [ ] Aucun bouton mort : chaque élément interactif déclenche une action visible.
 - [ ] Zéro secret dans le bundle client (`NEXT_PUBLIC_` audité propre).
@@ -936,7 +976,7 @@ cd projects/pos-nf525/app/mobile && npm run test
 - **Distribution Play Store:** refusée pour l'app fiscale (dépendance à une boutique, blocage possible) — distribution directe APK/MDM retenue.
 - **Mode anonyme / kiosque sans identification:** rejeté — NF525 exige la traçabilité nominative de chaque opération.
 - **Dark mode:** refusé pour l'instant (convention du projet ; la caisse reste claire et contrastée).
-- **Gestion de stock en v0.1:** repoussée en Phase 2 pour concentrer l'effort sur la conformité fiscale et le cœur d'encaissement.
+- **Gestion du stock en v0.1:** repoussée en Phase 2 pour concentrer l'effort sur la conformité fiscale et le cœur d'encaissement.
 
 ## 16. Open Questions & Technical Spikes (TBD)
 
@@ -945,6 +985,8 @@ cd projects/pos-nf525/app/mobile && npm run test
 - **Choix final du fournisseur VPS (Hetzner vs OVH vs Scaleway):** équivalents fonctionnellement — décision d'achat client.
 - **Revise juridique de la clause de dégradation (CGV):** recommandée par un professionnel du droit avant la mise en production — hors périmètre technique.
 - **Pilote TPE:** modèle du terminal du restaurant et flux exact (impression du ticket TPE, accord) — à observer en terrain.
+- **Modèle d'imprimante cible V1 (module IMP):** recommandation — **Xprinter XP-P323B** (Bluetooth) + **Epson TM-T20III** (réseau) pour les tests ; validation avec le restaurant pilote.
+- **Bibliothèque React Native ESC/POS:** `react-native-bluetooth-escpos-printer`, `react-native-thermal-receipt-printer`, ou équivalent maintenu — évaluation en Phase 3 (maintenance, couverture BT/USB/TCP).
 - **Paramètres précis du contrôle d'horloge (seuils, stratégie de resynchronisation progressive):** finalisés en conception technique (default: 60 s).
 
 ## 17. Project Glossary & Domain Terms
