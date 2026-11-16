@@ -10,10 +10,11 @@ ROUTES   := /login /dashboard /menu /utilisateurs /tables /rapports /journal /ex
 HARNESS  := ../../scripts/test-local.sh
 
 .DEFAULT_GOAL := help
-.PHONY: help stop clean install db-up db-down db-reset migrate seed dev check save push commit
+.PHONY: help stop clean info install db-up db-down db-reset migrate seed dev check save push commit
 
 help:
 	@echo "CaisseFlow — commandes locales"
+	@echo "  make info        Afficher les informations de l'application (URL, pages, comptes)"
 	@echo "  make install     Installer les dépendances (app/)"
 	@echo "  make stop        Arrêter les serveurs dev du projet (ports 3000/4173/4199)"
 	@echo "  make clean       Purger le cache .next (après CHAQUE modification, serveurs arrêtés)"
@@ -27,6 +28,41 @@ help:
 	@echo "  make reset       db-reset + migrate + seed (démo neuve)"
 	@echo "  make save MSG=\"...\"   Sauvegarder un commit git (un module = un commit)"
 	@echo "  make push        Pousser vers GitHub (origin main)"
+
+info:
+	@echo "================ CaisseFlow — POS restaurant conforme NF525 ================"
+	@echo "Application : CaisseFlow (dossier projet pos-nf525, v0.1.0 pilote)"
+	@echo "Hôte:port   : http://localhost:$(PORT)   (dev : make dev)"
+	@echo "Base        : PostgreSQL Docker 'caisseflow-db' — localhost:5433 (caisseflow)"
+	@echo ""
+	@echo "Page de connexion :"
+	@echo "  /login              Écran de connexion (identique à la page d'accueil /)"
+	@echo ""
+	@echo "Autres pages (session requise, RBAC par rôle) :"
+	@echo "  /dashboard          KPI du jour, TVA multi-taux, écritures récentes"
+	@echo "  /menu               Carte & TVA (CRUD articles)         [gérant]"
+	@echo "  /utilisateurs       Comptes web + matricules mobiles     [gérant]"
+	@echo "  /tables             Plan de salle                        [gérant]"
+	@echo "  /rapports           Totaux, TVA par taux, par serveur    [tous*]"
+	@echo "  /journal            Journal fiscal lecture seule         [tous*]"
+	@echo "  /exports            Exports signés SHA-256               [tous*]"
+	@echo "  /ticket-modele      Modèle de ticket                     [gérant]"
+	@echo "  /licence            État de la licence                   [tous, admin modifie]"
+	@echo "  /audit              Piste d'audit lecture seule          [tous*]"
+	@echo "  (* = gérant, expert-comptable, auditeur — l'admin n'a pas les données fiscales)"
+	@echo ""
+	@echo "Comptes back-office par défaut (données de démonstration) :"
+	@echo "  Gérant            gerant@local.test      Gerant123!"
+	@echo "  Expert-comptable  comptable@local.test   Compta123!"
+	@echo "  Auditeur          auditeur@local.test    Audit123!"
+	@echo "  Admin plateforme  admin@local.test       Admin123!"
+	@echo ""
+	@echo "Matricules mobiles (PIN, tablette caisse / terminaux) :"
+	@echo "  MGR 1234 · SEC 2345 · S07 3456 · K01 4567"
+	@echo ""
+	@echo "Jeton d'appareil de démonstration : device-token-demo-POSTE-01 (POSTE-01)"
+	@echo "⚠ Démo uniquement — ne jamais exécuter 'make seed' en production (voir HANDOFF.md)"
+	@echo "============================================================================"
 
 install:
 	cd $(APP) && npm install
