@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
-import { getSessionUser, can } from "../../../../lib/auth";
-import { pool } from "../../../../lib/db";
-import { assertSameOrigin, json, audit } from "../../../../lib/http";
+import { getSessionUser, can } from "../../../lib/auth";
+import { pool } from "../../../lib/db";
+import { assertSameOrigin, json, audit } from "../../../lib/http";
 
 // POST /api/tables — create (BO-3, gérant only).
 export async function POST(req) {

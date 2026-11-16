@@ -14,7 +14,11 @@ export async function POST(req) {
   await revokeSession(jar);
   if (user) await audit(user, "logout", "users_web", user.id, {});
 
-  const res = NextResponse.redirect(new URL("/login", req.url), 303);
+  // Redirect target is a constant ("/login"); the base URL comes from the
+  // deployment config (never from the request), so no request value can
+  // control the redirect destination (open-redirect hardening).
+  const base = process.env.APP_ORIGIN || "http://localhost:3000";
+  const res = NextResponse.redirect(new URL("/login", base), 303);
   res.cookies.set(SESSION_COOKIE, "", { path: "/", maxAge: 0 });
   return res;
 }

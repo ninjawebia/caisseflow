@@ -27,6 +27,7 @@ Comptes : fictifs (seed) · Production : jamais contactée.
 | Isolation & cycle de vie | aucun défaut | chaque requête scoppée `restaurant_id` ; append-only fiscal et audit |
 | Disponibilité & abus | durcissement | verrouillage durable sur login ; limiteur mémoire + endpoints authentifiés sans quota (§4) |
 | Chaîne d'approvisionnement | aucun défaut | dépendances minimales épinglées, `next@15.5.29` corrigé de la CVE connue ; `npm audit --deps` à relancer au moment du déploiement |
+| Redirection | aucun défaut | logout : cible constante `/login`, base `APP_ORIGIN` hors requête ; `?next=https://evil.example` ignoré (REJ-008) |
 
 ## 3. Contrôles positifs vérifiés (preuves locales bornées)
 

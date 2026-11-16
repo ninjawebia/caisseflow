@@ -40,6 +40,19 @@
       "check": "Après déploiement : curl -sI https://<hôte> — attendre HTTP/2 200, Strict-Transport-Security présent, et Set-Cookie avec Secure sur /api/auth/login."
     },
     {
+      "id": "REJ-008",
+      "state": "rejected",
+      "title": "Open redirect via la redirection de déconnexion",
+      "fingerprint": "logout-open-redirect",
+      "severity": null,
+      "trace": ["app/app/api/auth/logout/route.js (NextResponse.redirect constant /login, base APP_ORIGIN)"],
+      "principal": "attaquant forgeant un lien /api/auth/logout?next=https://evil.example",
+      "resource": "redirection post-logout du navigateur",
+      "observed": "logout?next=https://evil.example → 303 vers http://localhost:3000/login — le paramètre est ignoré, la cible est une constante",
+      "evidence": null,
+      "refuted_by": "aucune valeur de la requête n'entre dans la destination : URL fixe /login, base venue de APP_ORIGIN (variable de déploiement)"
+    },
+    {
       "id": "REJ-001",
       "state": "rejected",
       "title": "Injection SQL via les paramètres de recherche (/journal?q, /audit?q, filtres de période)",

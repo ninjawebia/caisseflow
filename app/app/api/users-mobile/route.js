@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
-import { getSessionUser, can } from "../../../../lib/auth";
-import { pool } from "../../../../lib/db";
-import { assertSameOrigin, json, audit } from "../../../../lib/http";
+import { getSessionUser, can } from "../../../lib/auth";
+import { pool } from "../../../lib/db";
+import { assertSameOrigin, json, audit } from "../../../lib/http";
 
 // POST /api/users-mobile — create a staff matricule with PIN (BO-2).
 export async function POST(req) {
