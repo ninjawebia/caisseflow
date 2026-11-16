@@ -32,6 +32,23 @@ Commit: `bash scripts/git-save.sh CaisseFlow "<message>"`
 | 10 | Journal d'audit | `/audit` | PASS 200 ; filtre `action=export` → 21 événements export rendus, lecture seule | 1a8eab1 | [x] |
 | 11 | Modèle de ticket | `/ticket-modele` + `/api/ticket-template` | PASS 200 ; PATCH gérant OK (logo + mentions persistés) ; comptable/admin → 403 (RBAC correct) | 1e2b952 | [x] |
 
+## Passes de test complet
+
+### Passe 2 — 2026-11-16 (après fix UX `69cb0b2`) : technique + fonctionnel, 4 rôles
+
+Technique : `make check` (stop → purge `.next` → harnais) **11/11 PASS 200** · `qa-check.sh` **0 FAIL / 0 WARN** · `security-audit.sh` **20 PASS / 0 FAIL / 0 WARN**.
+
+| Bloc | Tests | Résultat |
+| --- | --- | --- |
+| Auth (4 comptes web) | login gérant/comptable/auditeur/admin → 200 ; faux mot de passe → 401 ; POST sans Origin → 200 (toléré : cookie SameSite=Lax, décision documentée `lib/http.js`) ; Origin hostile `https://evil.example` → **403** ; logout → **303 /login** + session révoquée (« Session requise » ensuite) | ✅ |
+| RBAC 4 rôles × 11 pages | 44/44 conforme à `lib/auth.js` : menu/utilisateurs/tables/ticket → gérant seul ; rapports/audit → tous ; journal/exports → sauf admin ; licence/dashboard → tous ; admin sans restaurant → états vides prévus (« Aucune vente », « Aucune donnée ») | ✅ |
+| APIs métier | articles POST 201 + PATCH (version bump, `categorie_nom` renvoyé) + DELETE 200 ; comptable → 403 ; sans session → 403 ; ticket-template comptable → 403 ; licence PATCH admin 200 / gérant 403 ; exports POST complet 201 + GET fichier (gérant/comptable 200, admin 403, EMPREINTE SHA-256 en fin de fichier) | ✅ |
+| Sync appareil | pull Bearer `device-token-demo-POSTE-01` → 200 (carte + catalogue) ; faux jeton → 401 ; sans jeton → 401 ; `licence/status` appareil → 200 (route appareil, 401 en session web = attendu) ; push re-jeu seq 1 → `duplicates:1 rejected:0 chainVerified:true`, journal 23→23 lignes (idempotent) | ✅ |
+| Contenu pages | dashboard : 0 « Erreur de chargement », KPI **88,60 €** réels, CSS compilé local (`layout.css`) ; rapports : dates **16/11/2026** + Total période ; menu : chawarma + catégorie rendue ; utilisateurs/tables/journal/audit/licence/ticket-modele : marqueurs présents | ✅ |
+| Données de test | « Test Complet » désactivée (tracée, jamais supprimée) ; démo inchangée (23 écritures chaînées intactes) | ✅ |
+
+Anomalies constatées pendant la passe : les 403 initiaux venaient du script de test (en-tête Origin non étendu par guillemets simples) — re-testés et conformes.
+
 ## Notes
 
 - Reference images: `refs/`
