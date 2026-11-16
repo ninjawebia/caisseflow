@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+.dev.vars
+node_modules/
+dist/
+build/
+.dart_tool/
+.wrangler/
+.DS_Store
+Thumbs.db
