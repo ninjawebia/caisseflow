@@ -51,12 +51,12 @@ Via le **Makefile** (recommandé) :
 
 ```bash
 cd projects/CaisseFlow
-make install      # dépendances (première fois)
-make migrate      # PostgreSQL Docker + migrations idempotentes
-make seed         # données de démonstration (JAMAIS en production)
-make dev          # serveur → http://localhost:3000
-make check        # purge du cache .next + vérifie les 11 routes (PASS 200 attendu)
-make clean        # purge du cache .next seule (obligatoire après chaque modification de code)
+make up           # démarre les conteneurs (aucun Node sur la machine)
+make migrate      # migrations SQL versionnées (dans le conteneur web)
+make seed         # données de démo déterministes (JAMAIS en prod)
+make smoke        # test de fumée (chaînage NF525 + HTTP, dans les conteneurs)
+make test         # chaînage NF525 + healthcheck (dans les conteneurs)
+make clean        # purge des volumes de build (obligatoire après chaque modification)
 make reset        # base de démo neuve (volume supprimé + migrate + seed)
 ```
 
