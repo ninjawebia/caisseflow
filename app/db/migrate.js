@@ -2,7 +2,7 @@
 // Applies SQL migrations in order. Run: npm run db:migrate
 const fs = require("fs");
 const path = require("path");
-require("dotenv").config();
+require("dotenv").config({ path: path.join(__dirname, "..", "..", ".env") });
 const { pool } = require("../lib/db");
 
 async function main() {

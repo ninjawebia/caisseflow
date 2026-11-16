@@ -120,12 +120,13 @@ function fmt(n) {
 
 function Bars({ days }) {
   const max = Math.max(...days.map((d) => d.total), 1);
+  const barStyle = (total) => ({ height: Math.max(4, (total / max) * 100) + "%" });
   return (
     <div className="flex items-end gap-3 h-48">
       {days.map((d) => (
         <div key={d.day} className="flex-1 flex flex-col items-center gap-2">
           <span className="text-xs font-mono tabular-nums text-slate-500">{fmt(d.total)}</span>
-          <div className="w-full bg-blue-600 rounded-t-lg" style={{ height: `${Math.max(4, (d.total / max) * 100)}%` }} aria-label={`Ventes ${d.day}`} />
+          <div className="w-full bg-blue-600 rounded-t-lg" style={barStyle(d.total)} aria-label={`Ventes ${d.day}`} />
           <span className="text-xs text-slate-500">{d.day.slice(8)}/{d.day.slice(5, 7)}</span>
         </div>
       ))}
