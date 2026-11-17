@@ -2,7 +2,7 @@
 # Build APK CaisseFlow DANS le conteneur mobile (aucune commande Android/npm sur l'hôte).
 # Sortie : /outputs/caisseflow-<version>-release.apk (volume monté → apps/mobile/outputs).
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."   # racine du projet mobile (/repo/apps/mobile)
 
 echo "— 1/3 expo prebuild (génération du projet natif android/)"
 npx expo prebuild --platform android --no-install

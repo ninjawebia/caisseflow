@@ -7,9 +7,10 @@ apps/web/.next/static
 **/build
 **/.turbo
 
-# Local build outputs (mobile APK goes to mounted volume)
+# Local build outputs (mobile APK → output/apk, rapports, exports, logs)
+output
+logs
 apps/mobile/outputs
-**/*.apk
 
 # Secrets — never in images
 **/.env

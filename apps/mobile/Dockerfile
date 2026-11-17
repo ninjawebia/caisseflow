@@ -24,9 +24,10 @@ RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
     sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" > /dev/null
 
 WORKDIR /repo
-# Dépendances (réinstallées si package-lock change — cache de couches Docker).
-COPY apps/mobile/package.json apps/mobile/package.json ./
-RUN cd apps/mobile && npm ci --no-audit --no-fund
+# Dépendances (pas de lockfile commité → npm install ; réinstallées si
+# package.json change — cache de couches Docker).
+COPY apps/mobile/package.json /repo/apps/mobile/package.json
+RUN cd apps/mobile && npm install --no-audit --no-fund
 
 COPY . .
 USER root
