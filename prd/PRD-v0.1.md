@@ -962,6 +962,62 @@ cd projects/CaisseFlow/app/mobile && npm run test
 
 ## 14. Proposed Features / Later Phase (Post-MVP Roadmap)
 
+> **Ajout du 2026-11-17** — deux évolutions demandées et validées au backlog (phase 2, après le socle RN) :
+> **F1. Gestion des catégories** et **F2. Photos des articles** — analyse RBAC détaillée ci-dessous.
+> Rattachées à l'exigence **BO-1** (Gestion menu). **Non implémentées en v0.1.**
+
+### 14.1 [BACKLOG F1] Gestion des catégories (BO-1.x)
+
+Créer, modifier, archiver/supprimer des catégories et les associer aux articles du menu.
+
+**Droits RBAC (alignés sur la ligne « Menu / Articles / TVA » de § 3.2 — la catégorie est une sous-entité du menu) :**
+
+| Action | Gérant | Second | Serveur / Cuisine | Expert-comptable / Contrôleur | Admin plateforme | Public |
+| --- | --- | --- | --- | --- | --- | --- |
+| Créer une catégorie | **C** | — | — | — | — | Denied |
+| Lire / lister (menu, sync pull) | R | R | R | R | — | Denied |
+| Modifier (nom, ordre, salle) | **U** | — | — | — | — | Denied |
+| Associer/dissocier un article | **U** (via article) | — | — | — | — | Denied |
+| Archiver (désactiver) | **U** | — | — | — | — | Denied |
+| Supprimer définitivement | **D** (si vide) | — | — | — | — | Denied |
+
+**Restrictions :**
+- **Suppression refusée si la catégorie contient des articles** (contrainte FK + contrôle applicatif → `400` explicite). Parcours attendu : archiver (`actif = false`) ou ré-associer les articles d'abord.
+- Une catégorie archivée reste en base (les exports/rapports historiques gardent leur cohérence), disparaît des listes de sélection et du `sync pull`.
+- Renommage propagé aux tablettes au prochain `sync pull` (pas de push forcé — offline-first).
+- La modification d'un **prix** pendant le service reste un événement journal `CHANGEMENT_PRIX` (POS-7, validateur second) — elle n'est pas concernée par cette fonctionnalité.
+
+**Journalisation :** **`audit_log`** (acteur, horodatage, action, id catégorie, restaurant) — **pas** `journal_replica` : la gestion du menu n'est pas un événement fiscal NF525 (aucune VENTE/PAIEMENT/ANNULATION en jeu). Règle inchangée : le journal fiscal ne trace que la chaîne d'encaissement.
+
+**Points techniques :** endpoint `GET/POST /api/categories` + `PATCH/DELETE /api/categories/[id]` (CSRF `assertSameOrigin`, re-validation serveur du DTO — pattern `packages/shared`) ; colonne `actif` sur `categories` (migration SQL versionnée, pattern 0002) ; DTO `validateCategory` dans `@caisseflow/shared` (2–40 caractères) ; guard « non vide » en SQL (`SELECT COUNT(*)` en transaction) ; écran BO `/menu` — panneau latéral catégories (gérant) + lecture dans sync pull.
+
+### 14.2 [BACKLOG F2] Photos des articles (BO-1.x)
+
+Ajouter, remplacer et supprimer une photo par article, avec stockage persistant et affichage (menu BO + tablettes via sync).
+
+**Droits RBAC (la photo est un attribut éditorial de l'article — même ligne « Menu » de § 3.2) :**
+
+| Action | Gérant | Second | Serveur / Cuisine | Expert-comptable / Contrôleur | Admin plateforme | Public |
+| --- | --- | --- | --- | --- | --- | --- |
+| Ajouter / remplacer une photo | **C,U** | — | — | — | — | Denied |
+| Supprimer la photo | **D** | — | — | — | — | Denied |
+| Afficher la photo (BO + POS/KDS/TERM) | R | R | R | R(export si inclus) | — | Denied |
+
+**Restrictions :**
+- **Formats** : JPEG/PNG/WebP uniquement — validation serveur par **magic bytes** (jamais le `Content-Type` du client, jamais le nom de fichier).
+- **Taille** : ≤ 2 Mo ; dimensions ≤ 2048 px — redimensionnement/re-encodage côté serveur (dans le conteneur) + vignette 512 px générée pour les listes.
+- **Nom de fichier** : généré aléatoirement côté serveur (UUID) — le nom fourni par le client n'est jamais conservé (injection de chemin, XSS via nom).
+- **Stockage** : répertoire de données persistant monté en **volume Docker** (dev) / volume Dokploy ou stockage objet S3-compatible (prod) ; chemin référencé en base (`articles.photo_url` — migration SQL versionnée). **PAS sur l'hôte** : données applicatives, pas des fichiers d'exploitation (voir README « Arborescence et fichiers modifiables »).
+- **Remplacement** : l'ancienne photo est archivée puis purgée (rétention 30 j) — jamais écrasée en place, pour laisser le temps aux tablettes de re-télécharger via cache ETag.
+- **Suppression** : fichier retiré + `photo_url` = NULL ; les **exports fiscaux ne sont pas affectés** (les archives exportent noms/prix/TVA, pas les photos) ; entrée `audit_log`.
+- Tablette **hors ligne** : la photo est téléchargée au `sync pull` et mise en cache local (clé ETag = hash du fichier) — le menu reste utilisable sans réseau, photo optionnelle.
+
+**Journalisation :** **`audit_log`** (comme F1) — hors périmètre fiscal NF525 ; aucune écriture `journal_replica`.
+
+**Points techniques :** `POST/DELETE /api/articles/[id]/photo` (multipart, CSRF, gérant only) ; service du fichier par route authentifiée (pas de listing public) ; migration 0005 (`photo_url TEXT NULL`, `photo_hash TEXT NULL`) ; lib partagée `@caisseflow/shared` : limites de taille/dimensions comme constante unique ; génération de vignettes via lib de traitement d'image exécutée dans le conteneur.
+
+
+
 - **Commande client par QR code:** le client commande depuis son téléphone et paie à table (Phase 2) ; les commandes client arrivent sur la tablette caisse comme les commandes serveur, même chaîne fiscale.
 - **Gestion de stock:** décrément des articles cuisinés, alertes de rupture (remonte aux 3–5 restaurants).
 - **Intégration TPE directe:** pilotage du terminal de paiement depuis la caisse (retour automatique du résultat).

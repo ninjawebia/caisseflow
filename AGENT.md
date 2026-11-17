@@ -28,9 +28,9 @@
 
 ## Outils disponibles
 
-- **Harnais technique** : `make check` (11 routes PASS 200 attendu), `scripts/test-local.sh CaisseFlow --check`, `scripts/qa-check.sh CaisseFlow`, `scripts/security-audit.sh CaisseFlow` (gate : exit 0 obligatoire).
-- **Requêtes HTTP** : `curl` avec jars de cookies (4 comptes web : gerant/comptable/auditeur/admin `@local.test`) ; jeton appareil `device-token-demo-POSTE-01` (Bearer) pour `/api/sync/*` et `/api/licence/status`.
-- **Vérifications SQL de chaînage** (PostgreSQL Docker `caisseflow-db`, port 5433) :
+- **Harnais technique (100 % Docker — aucun node/npm sur l'hôte)** : `make smoke` (migrate + seed + chaînage + health + HTTP), `make test` (chaînage NF525 + healthcheck), `make chain-check`, `scripts/qa-check.sh CaisseFlow`, `scripts/security-audit.sh CaisseFlow` (gate : exit 0 obligatoire).
+- **Requêtes HTTP** : depuis les conteneurs (`docker compose exec web node -e "fetch…"`) ou `curl` avec jars de cookies (4 comptes web : gerant/comptable/auditeur/admin `@local.test`) ; jeton appareil `device-token-demo-POSTE-01` (Bearer) pour `/api/sync/*` et `/api/licence/status`.
+- **Vérifications SQL de chaînage** (service compose `postgres` — `make shell-postgres`) :
   ```sql
   -- contrôle de chaînage complet sur la réplique (à exécuter via psql)
   SELECT seq, hash_prev = LAG(hash_self) OVER (ORDER BY seq) AS chaine_ok
@@ -38,10 +38,14 @@
   -- idempotence push : comptage avant/après sur (restaurant_id, uuid_op)
   SELECT COUNT(*) FROM journal_replica WHERE restaurant_id = $1;
   ```
-- **Base** : `docker exec caisseflow-db psql -U caisseflow -d caisseflow` ; copies isolées via `pg_dump`/`CREATE DATABASE ... TEMPLATE` pour les tests destructifs.
+- **Base** : `docker compose exec postgres psql -U caisseflow -d caisseflow` ; copies isolées via `make backup` + `make restore FILE=…` sur une base de test pour les tests destructifs.
 - **UI BO** : navigateur (Playwright recommandé pour automatiser les parcours ; headless acceptable, captures obligatoires sur FAIL).
 - **Mobile (quand les apps RN existeront)** : Appium + `adb` (force-stop pour TC-OFF-003, mode avion pour le bloc offline) ; imprimantes ESC/POS de la liste cible (TC-COMPAT-004).
 - **À compléter par l'opérateur selon le poste** : URL préprod dédiée, tablettes Android disponibles, imprimantes de test, k6/JMeter pour la charge.
+
+## Annexe — Backlog Phase 2 (2026-11-17)
+
+Les fonctionnalités **F1 « catégories »** et **F2 « photos d'articles »** (PRD ch. 14.1/14.2, écrans `DESIGN-BLUEPRINT.md` § 9) sont **au backlog, pas implémentées**. Leurs cas `TC-BO1-CAT-*` / `TC-BO1-PHOTO-*` (TEST-PLAN § 21) restent `NON TESTÉ` et sont **exclus du compte des 136 cas du livrable v0.1** : les exécuter uniquement au moment de leur développement (avant le niveau 4 du cycle), avec le rappel transversal : la gestion du menu n'écrit **jamais** dans `journal_replica` — traçabilité par `audit_log` uniquement, sauf changement de prix en service (événement `CHANGEMENT_PRIX`, POS-7, validateur second).
 
 ## Format du rapport de sortie
 

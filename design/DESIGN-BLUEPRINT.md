@@ -204,3 +204,21 @@ A detailed UI/UX design specification. No reference images were supplied (PRD A9
 - **Dictionary default / template:** primary accent `#0F172A` (slate-900).
 - **Applied:** `#2563EB` (blue-600) as brand CTA accent; slate-900 retained for secondary emphasis and POS status bar.
 - **Justification:** CaisseFlow brand identity needs one recognizable operational accent on busy POS surfaces; blue is distinct from all three semantic colors (success/warning/danger), avoiding state confusion on the salle grid.
+
+---
+
+## 9. Backlog UI — évolutions prévues (Phase 2, PRD ch. 14.1/14.2)
+
+> **Non implémenté en v0.1** — spécifications visuelles à produire avec le même protocole (7 étapes) avant développement. Rattachées à la surface D (back-office) et à la surface A (menu tablette).
+
+### 9.1 Écran « Catégories » (F1 — gérant uniquement)
+- **Emplacement** : panneau latéral gauche de la page `/menu` (320 px, même grille que la liste d'articles) ; sur mobile POS : accordéon replié.
+- **Composants** : liste de catégories avec compteur d'articles (badge slate), actions au survol (crayon 🖊 / archive 🗄 / corbeille 🗑 — 40×40 px, surface D = cible 44 px minimum), bouton primaire « + Nouvelle catégorie » (#2563EB, texte blanc), modale de confirmation pour archivage/suppression.
+- **États obligatoires** : vide (« Aucune catégorie — créez la première »), chargement (skeleton 3 lignes), erreur (bannière rouge + bouton réessayer), catégorie archivée (opacité 50 % + badge « Archivée »), tentative de suppression d'une catégorie non vide (modale d'erreur avec liste des articles concernés).
+- **Accessibilité** : navigation clavier complète (Tab/Échap sur la modale), focus visible, libellés explicites (jamais une icône seule).
+
+### 9.2 Photo d'article (F2 — gérant uniquement)
+- **Dans l'éditeur d'article** (`/menu`, modale) : zone d'upload « Glissez une photo ou cliquez » (aspect 4:3, bordure dashed slate-300, icône image 24 px), aperçu immédiat après sélection, bouton « Remplacer » et « Supprimer » (rouge-600, confirmation modale), message de progression.
+- **Dans la grille du menu / sync tablette** : vignette 512 px générée (coin arrondi 8 px, aspect-ratio 1:1, fallback = initiale de l'article sur fond slate-100).
+- **États obligatoires** : sans photo (fallback initiale), en cours d'upload (barre + désactivation des boutons), format/taille refusés (message inline rouge sous la zone : « JPEG, PNG ou WebP — 2 Mo max »), erreur serveur (toast rouge + image conservée).
+- **Règles dictionnaire** : contrastes 4.5:1, pas d'information portée par la couleur seule (l'état « sans photo » porte une initiale lisible).

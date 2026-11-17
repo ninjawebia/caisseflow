@@ -9,6 +9,11 @@ npx expo prebuild --platform android --no-install
 
 echo "— 2/3 Gradle assembleRelease"
 cd android
+# Incohérence RN 0.76.x ↔ expo-modules-core : le catalog de versions de
+# react-native épingle kotlin = 1.9.24, mais expo-modules-core (Compose 1.5.15)
+# exige 1.9.25 — alignement du catalog (correctif documenté expo).
+sed -i 's/^kotlin = "1.9.24"/kotlin = "1.9.25"/' ../node_modules/react-native/gradle/libs.versions.toml
+grep -q "^kotlinVersion=" gradle.properties || echo "kotlinVersion=1.9.25" >> gradle.properties
 ./gradlew assembleRelease --no-daemon
 
 echo "— 3/3 copie de l'APK vers output/apk (bind-mount hôte, UID 1000)"

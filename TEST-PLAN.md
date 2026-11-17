@@ -433,3 +433,42 @@ Chaque cas porte : **ID**, **titre**, **module**, **exigence PRD liée**, **prio
 
 - Les tests `TC-NF525-009` (altération) et `TC-OFF-003` (crash) doivent impérativement tourner sur une **copie isolée** de la base ; jamais sur les données réelles de démo (règle append-only).
 - Les tests « deux postes » exigent un provisioning POSTE-02 en préprod (seed actuel : POSTE-01 seulement).
+
+---
+
+## 21. Backlog de test — Phase 2 (PRD ch. 14.1/14.2 — NON EXÉCUTABLE tant que non implémenté)
+
+> Ajouté le 2026-11-17. Ces cas restent `NON TESTÉ` ; ils deviennent exécutables au moment du développement des fonctionnalités F1 (catégories) et F2 (photos d'articles). Aucun n'est bloquant pour le livrable v0.1.
+
+### 21.1 TC-BO1-CAT — Gestion des catégories (surface BO)
+
+| ID | Précondition | Action | Attendu |
+| --- | --- | --- | --- |
+| TC-BO1-CAT-001 | Gérant connecté | POST /api/categories {nom} | `201` ; catégorie visible dans /menu et sync pull |
+| TC-BO1-CAT-002 | Gérant | PATCH /api/categories/[id] | `200` ; renommage propagé au prochain sync pull |
+| TC-BO1-CAT-003 | Gérant | DELETE catégorie **vide** | `200` ; disparue des listes ; `audit_log` écrit |
+| TC-BO1-CAT-004 | Gérant | DELETE catégorie **avec articles** | `400` explicite, rien de supprimé, articles intacts |
+| TC-BO1-CAT-005 | Gérant | Archiver catégorie (actif=false) | `200` ; absente des sélections ; historique exports intact |
+| TC-BO1-CAT-006 | Comptable / Auditeur | POST ou DELETE catégorie | `403` |
+| TC-BO1-CAT-007 | Second (mobile) | lecture via sync | `R` uniquement — pas d'endpoint d'écriture |
+| TC-BO1-CAT-008 | Gérant | nom invalide (« A » / 60+ car.) | `400` (DTO `@caisseflow/shared`) |
+| TC-BO1-CAT-009 | — | Vérifier aucune écriture journal_replica | Chaînage intact, aucune écriture (FISC non impacté) |
+
+### 21.2 TC-BO1-PHOTO — Photos des articles (surface BO)
+
+| ID | Précondition | Action | Attendu |
+| --- | --- | --- | --- |
+| TC-BO1-PHOTO-001 | Gérant | POST photo JPEG/PNG/WebP ≤ 2 Mo | `201` ; `photo_url` renseigné ; vignette 512 px générée |
+| TC-BO1-PHOTO-002 | Gérant | POST PDF/GIF renommé .jpg (magic bytes ≠ image) | `400` — validation par magic bytes |
+| TC-BO1-PHOTO-003 | Gérant | POST image > 2 Mo ou > 2048 px | `400` — limites explicites |
+| TC-BO1-PHOTO-004 | Gérant | Remplacer la photo | ancienne archivée (rétention 30 j), nouvelle servie, ETag différent |
+| TC-BO1-PHOTO-005 | Gérant | DELETE la photo | fichier retiré + `photo_url` = NULL + `audit_log` |
+| TC-BO1-PHOTO-006 | Comptable / Auditeur / Second | POST/DELETE photo | `403` |
+| TC-BO1-PHOTO-007 | Serveur authentifié | GET photo | `200` (vignette/originale) ; **sans session** → `401/403` |
+| TC-BO1-PHOTO-008 | Tablette offline | sync pull après upload | photo_url présent, téléchargée au pull, menu utilisable hors ligne |
+| TC-BO1-PHOTO-009 | — | Nom de fichier client malveillant (`../../x.php`, `<script>.jpg`) | ignoré — nom UUID serveur, aucune écriture hors du volume uploads |
+| TC-BO1-PHOTO-010 | — | Exports fiscaux avant/après suppression photo | identiques (les photos n'entrent pas dans les archives) |
+
+### 21.3 Non-régression associée
+
+- TC-REG-nouveau : après implémentation, rejouer les cas BO existants (articles CRUD, sync pull, exports) + `make smoke` — la migration 0005 (`photo_url`, `actif` catégories) doit rester idempotente et le chaînage intact.

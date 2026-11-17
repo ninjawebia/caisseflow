@@ -65,4 +65,6 @@ Anomalies constatées pendant la passe : les 403 initiaux venaient du script de 
 | Compose | dev : hot-reload + postgres healthy-gated + adminer + mailhog, réseau `caisseflow-net`, volumes nommés · prod : image buildée + Caddy HTTPS, `.env.prod`, 2 variantes DB |
 | Data | SQL versionné conservé (décision PRD 9) ; migrations 0003/0004 : triggers RAISE EXCEPTION sur journal_replica + clotures (remplace les RULES silencieuses de 0001 — preuve observable TC-NF525-010) |
 | Preuve | `docker compose down -v` (machine vierge) → up → migrate (0001…0004) → seed → `make smoke` PASS ; UPDATE/DELETE journal → `ERROR: NF525 …` ; qa 0/0 ; audit 20 PASS |
+| Nettoyage hôte | ✅ appliqué (17/11) : `apps/web/node_modules`, `apps/web/.next`, cache npm, conteneur `caisseflow-db` — supprimés ; recréés dans les conteneurs |
+| Backlog | 17/11 : F1 « catégories » + F2 « photos d'articles » (PRD ch. 14.1/14.2, BLUEPRINT § 9, TEST-PLAN § 21 = 19 cas NON TESTÉ, AGENT/SKILL annexe) — RBAC : gérant seul en écriture, hors journal NF525 (audit_log) |
 | Nettoyage hôte | Proposé à validation : `app/node_modules` (518 M), `app/.next` (50 M), cache npm — non supprimés sans accord |

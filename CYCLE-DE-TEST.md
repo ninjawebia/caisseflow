@@ -132,3 +132,9 @@ La recette n'est terminée que si **tous** ces points sont validés sans anomali
 - Gate sécurité : `security-audit.sh` exit 0 (0 FAIL) ;
 - `make check` : 11/11 PASS sur un cache purgé ;
 - Rapport final GO/NO-GO signé (format AGENT.md § rapport).
+
+---
+
+## Annexe — Backlog Phase 2 (2026-11-17)
+
+Les cas **TC-BO1-CAT-001…009** et **TC-BO1-PHOTO-001…010** (`TEST-PLAN.md` § 21) correspondent aux fonctionnalités F1 « catégories » et F2 « photos d'articles » (PRD ch. 14.1/14.2) — **en dehors de l'entonnoir actuel** : ils ne s'exécutent qu'au moment de leur développement (au-dessus du niveau 3 du cycle, avant la non-régression) et ne comptent pas dans le total des 136 cas du livrable v0.1. Rappel transversal : vérifier à chaque exécution que la gestion menu n'écrit **jamais** dans `journal_replica` (TC-BO1-CAT-009, TC-BO1-PHOTO-010).

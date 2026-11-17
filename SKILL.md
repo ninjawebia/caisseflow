@@ -14,6 +14,10 @@ Compétence réutilisable : exécuter, dans l'ordre imposé, la suite de tests d
 - **Avant toute mise en production** : recette complète (les 8 phases du cycle, tous les cas exécutables, les 26 bloquants PASS obligatoires) ;
 - **Après correction de bug** : cas d'origine + non-régression associée (créer un TC-REG-xxx si le bug provient d'un retour utilisateur).
 
+## Backlog Phase 2 (hors périmètre v0.1)
+
+Les fonctionnalités **F1 « catégories »** et **F2 « photos d'articles »** (PRD ch. 14.1/14.2 ; écrans DESIGN-BLUEPRINT § 9 ; cas TEST-PLAN § 21) sont documentées mais **non implémentées** : leurs 19 cas de test ne comptent pas dans le total v0.1 et ne s'exécutent qu'au moment de leur développement. Ne pas les inclure dans un rapport GO/NO-GO v0.1, sauf à les lister explicitement comme « backlog, hors périmètre ».
+
 ## Prérequis
 
 - Environnement **préprod démarré** : PostgreSQL Docker `caisseflow-db` (port 5433) + back-office (`make dev`, port 3000) ; `make check` = 11/11 PASS 200 sur un cache purgé ;

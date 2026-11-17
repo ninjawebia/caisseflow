@@ -2,13 +2,19 @@
 # PAS DE RUNTIME : l'app tourne sur les tablettes Android — ce conteneur ne sert
 # qu'à produire l'APK de manière identique sur n'importe quelle machine.
 # Usage : docker compose run --rm mobile ./scripts/build-apk.sh
-#        (l'APK atterrit dans ./apps/mobile/outputs monté en volume)
+#        (l'APK atterrit dans ./output/apk monté en volume)
 #
+# Base Debian (jammy) OBLIGATOIRE : AAPT2 (build-tools Android) est un binaire
+# glibc et ne démarre pas sous Alpine/musl (« Daemon startup failed »).
 # ⚠ Premier build : téléchargement Android SDK (~3 Go) — 10 à 20 min.
-FROM eclipse-temurin:17-jdk-alpine AS base
+FROM eclipse-temurin:17-jdk-jammy AS base
 
-# Node 22 (Expo CLI / Metro) — installé depuis les packages officiels alpine.
-RUN apk add --no-cache nodejs npm bash curl unzip git
+# Node 22 (Expo CLI / Metro) via le tarball officiel + outils du SDK.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      curl unzip git ca-certificates xz-utils file \
+ && curl -fsSL https://nodejs.org/dist/v22.14.0/node-v22.14.0-linux-x64.tar.xz \
+      | tar -xJ -C /usr/local --strip-components=1 \
+ && rm -rf /var/lib/apt/lists/*
 ENV NODE_OPTIONS=--max-old-space-size=4096
 
 # Android SDK (command-line tools) + licences + plateformes/build-tools cibles.
@@ -28,6 +34,10 @@ WORKDIR /repo
 # package.json change — cache de couches Docker).
 COPY apps/mobile/package.json /repo/apps/mobile/package.json
 RUN cd apps/mobile && npm install --no-audit --no-fund
+# Détection mono-repo d'expo (@expo/metro-config) : le bundler stat /repo/node_modules
+# (nodeModulesPaths du workspace racine) — le créer vide, la résolution retombe
+# sur apps/mobile/node_modules.
+RUN mkdir -p /repo/node_modules
 
 COPY . .
 USER root
