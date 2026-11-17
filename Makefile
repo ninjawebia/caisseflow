@@ -9,7 +9,8 @@ COMPOSE_P := docker compose -f docker-compose.prod.yml
 .DEFAULT_GOAL := help
 .PHONY: help up up-all down restart ps logs stop-web clean build shell-web shell-postgres \
         shell-adminer shell-mailhog shell-mobile migrate seed test \
-        chain-check healthcheck smoke reset backup restore build-apk fix-perms info push
+        chain-check healthcheck smoke reset backup restore build-apk fix-perms info push \
+        license-keygen license-gen
 
 help:
 	@echo "CaisseFlow — commandes (100 % Docker, aucune installation Node requise)"
@@ -106,6 +107,24 @@ shell-mobile:
 # Migrations SQL versionnées (dans le conteneur web, ledger schema_migrations).
 migrate:
 	$(COMPOSE) exec web sh -c "cd /repo/apps/web && node db/migrate.js"
+
+# --- Licences (clés signées Ed25519 — LIC, vérification 100 % locale) ---
+# Paire PROPRIÉTAIRE : infra/keys/owner/ (gitignorée — JAMAIS commitée).
+license-keygen:
+	docker run --rm -v "$$PWD":/repo -w /repo node:22-alpine sh -c "\
+	  node -e \"const{generateKeyPairSync}=require('crypto');const{publicKey,privateKey}=generateKeyPairSync('ed25519');\
+	  require('fs').mkdirSync('infra/keys/owner',{recursive:true});\
+	  require('fs').writeFileSync('infra/keys/owner/public.pem',publicKey.export({type:'spki',format:'pem'}));\
+	  require('fs').writeFileSync('infra/keys/owner/private.pem',privateKey.export({type:'pkcs8',format:'pem'}));\" \
+	  && chmod 600 infra/keys/owner/private.pem && chmod 644 infra/keys/owner/public.pem"
+	@echo "Paire propriétaire créée : infra/keys/owner/{private,public}.pem"
+	@echo "→ En production, montez LICENSE_PUBLIC_KEY=infra/keys/owner/public.pem dans l'environnement du conteneur web."
+
+# Génère une clé de licence pour un client (RID = UUID du restaurant).
+license-gen:
+	@test -n "$(RID)" || { echo "Usage: make license-gen RID=<UUID restaurant> EXP=AAAA-MM-JJ PLAN=pro"; exit 1; }
+	@docker run --rm -v "$$PWD":/repo -w /repo node:22-alpine node apps/web/scripts/license-gen.js \
+	  --rid "$(RID)" $(if $(EXP),--exp "$(EXP)",) $(if $(PLAN),--plan "$(PLAN)")
 
 # Seed déterministe — refusé automatiquement si NODE_ENV=production.
 seed:

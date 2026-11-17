@@ -3,6 +3,7 @@ import { getSessionUser, can } from "../../../../../lib/auth";
 import { deviceAuth } from "../../../../../lib/device";
 import { pool } from "../../../../../lib/db";
 import { assertSameOrigin, json, audit } from "../../../../../lib/http";
+import { licenceGate } from "../../../../../lib/license";
 import fs from "fs";
 import { validate, save, archive, detectImage, ALLOWED, pathOf } from "../../../../../lib/uploads";
 
@@ -67,6 +68,10 @@ export async function POST(req, ctx) {
   if (csrf) return csrf;
   const user = await getSessionUser(await cookies());
   if (!user || !can(user.role, "menu") || !user.restaurantId) return json({ error: "Accès refusé" }, 403);
+  // Gate licence : écritures refusées si expirée/bloquée (lecture OK, LIC-4).
+  const lic = await licenceGate(user.restaurantId);
+  if (!lic.ok) return json({ error: lic.error }, 403);
+
 
   const r = await pool.query(
     "SELECT id FROM articles WHERE id = $1 AND restaurant_id = $2",
@@ -102,6 +107,10 @@ export async function DELETE(req, ctx) {
   if (csrf) return csrf;
   const user = await getSessionUser(await cookies());
   if (!user || !can(user.role, "menu") || !user.restaurantId) return json({ error: "Accès refusé" }, 403);
+  // Gate licence : écritures refusées si expirée/bloquée (lecture OK, LIC-4).
+  const lic = await licenceGate(user.restaurantId);
+  if (!lic.ok) return json({ error: lic.error }, 403);
+
 
   const r = await pool.query(
     "SELECT photo_file FROM articles WHERE id = $1 AND restaurant_id = $2",

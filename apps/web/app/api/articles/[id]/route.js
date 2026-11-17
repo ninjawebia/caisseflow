@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { getSessionUser, can } from "../../../../lib/auth";
 import { pool } from "../../../../lib/db";
 import { assertSameOrigin, json, audit } from "../../../../lib/http";
+import { licenceGate } from "../../../../lib/license";
 import { validateArticle } from "@caisseflow/shared";
 
 // PATCH /api/articles/[id] — update (price change creates a new version, BO-1).
@@ -10,6 +11,10 @@ export async function PATCH(req, ctx) {
   if (csrf) return csrf;
   const user = await getSessionUser(await cookies());
   if (!user || !can(user.role, "menu") || !user.restaurantId) return json({ error: "Accès refusé" }, 403);
+  // Gate licence : écritures refusées si expirée/bloquée (lecture OK, LIC-4).
+  const lic = await licenceGate(user.restaurantId);
+  if (!lic.ok) return json({ error: lic.error }, 403);
+
   const id = (await ctx.params).id;
 
   const body = await req.json().catch(() => null);
@@ -52,6 +57,10 @@ export async function DELETE(req, ctx) {
   if (csrf) return csrf;
   const user = await getSessionUser(await cookies());
   if (!user || !can(user.role, "menu") || !user.restaurantId) return json({ error: "Accès refusé" }, 403);
+  // Gate licence : écritures refusées si expirée/bloquée (lecture OK, LIC-4).
+  const lic = await licenceGate(user.restaurantId);
+  if (!lic.ok) return json({ error: lic.error }, 403);
+
   const id = (await ctx.params).id;
 
   const r = await pool.query(

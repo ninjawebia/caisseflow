@@ -19,7 +19,7 @@ export default async function LicencePage() {
     restaurantId = first.rows[0]?.id || null;
   }
   const r = await pool.query(
-    "SELECT etat, impayee_depuis, grace1_at, grace2_at, bloque_at FROM licences WHERE restaurant_id=$1",
+    "SELECT etat, impayee_depuis, grace1_at, grace2_at, bloque_at, expires_at, plan FROM licences WHERE restaurant_id=$1",
     [restaurantId]
   );
   const row = r.rows[0] || {};
@@ -29,13 +29,19 @@ export default async function LicencePage() {
     grace2At: row.grace2_at || null,
     bloqueAt: row.bloque_at || null,
   };
+  const licenceInfo = {
+    etat: row.etat || "active",
+    plan: row.plan || null,
+    expires: row.expires_at ? new Date(row.expires_at).toLocaleDateString("fr-FR") : null,
+  };
 
   return (
     <Shell user={user} active="/licence" licence={licence}>
       <PageHeader title="Licence" subtitle="États : active → rappel (J+30) → cloud suspendu (J+60) → bloquée (J+90) — l'accès aux données fiscales n'est jamais interrompu (LIC-4)">
         <StatusPill tone={licence?.tone || "neutral"}>{licence?.label || "—"}</StatusPill>
       </PageHeader>
-      <LicenceClient etat={row.etat || "active"} isAdmin={user.role === "admin_plateforme"} phases={phases} />
+      <LicenceClient etat={row.etat || "active"} isAdmin={user.role === "admin_plateforme"} phases={phases}
+        canActivate={user.role === "gerant"} licenceInfo={licenceInfo} />
     </Shell>
   );
 }

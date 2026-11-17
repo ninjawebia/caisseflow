@@ -2,11 +2,33 @@
 import { useState } from "react";
 
 // Licence management (S-09, LIC-1..4). Reading is open to all staff; only the
-// platform admin changes the state (server-side enforced). grace2/bloquee
-// suspend cloud sync but NEVER block access to fiscal data (LIC-4).
-export default function LicenceClient({ etat, isAdmin, phases }) {
+// platform admin changes the state and ONLY the gérant activates a licence KEY
+// (server-side enforced). grace2/bloquee suspend cloud sync but NEVER block
+// access to fiscal data (LIC-4). Activation : clé signée vérifiée en local.
+export default function LicenceClient({ etat, isAdmin, phases, canActivate, licenceInfo }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [cle, setCle] = useState("");
+
+  async function activate(e) {
+    e.preventDefault();
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await fetch("/api/licence/activate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cle: cle.trim() }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) { setMsg({ tone: "danger", text: data.error || "Activation refusée" }); return; }
+      setMsg({ tone: "success", text: "Licence activée" + (data.licence?.expires_at ? ` — valable jusqu'au ${data.licence.expires_at}` : " (perpétuelle)") });
+      setCle("");
+      setTimeout(() => window.location.reload(), 1200);
+    } catch {
+      setMsg({ tone: "danger", text: "Serveur indisponible — réessayez" });
+    } finally { setBusy(false); }
+  }
 
   async function setEtat(next) {
     setBusy(true);
@@ -62,6 +84,41 @@ export default function LicenceClient({ etat, isAdmin, phases }) {
           </dl>
         )}
       </div>
+
+      {/* Activation par clé signée (gérant) — vérification locale, aucun serveur */}
+      {canActivate ? (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-slate-900 mb-1">Ajouter une licence</h2>
+          <p className="text-xs text-slate-500 mb-4">
+            Collez la clé reçue du revendeur (format « CF-… »). La vérification est locale :
+            une clé valide active le logiciel jusqu'à sa date d'expiration, une clé
+            invalide ou expirée est refusée sans changement d'état.
+          </p>
+          <form onSubmit={activate} className="flex flex-col sm:flex-row gap-2" data-form="licence-activate">
+            <label htmlFor="lic-cle" className="sr-only">Clé de licence</label>
+            <input id="lic-cle" value={cle} onChange={(e) => setCle(e.target.value)} placeholder="CF-…"
+              required className="h-10 flex-1 px-3 bg-white border border-slate-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-1 transition-shadow" />
+            <button type="submit" disabled={busy} data-action="licence-activate"
+              className="h-10 px-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-medium rounded-lg transition-[transform,colors] duration-150 disabled:opacity-50 disabled:pointer-events-none">
+              {busy ? "Vérification…" : "Activer"}
+            </button>
+          </form>
+          {msg && <div className={`text-sm p-3 mt-3 rounded-xl border ${msg.tone === "danger" ? "bg-rose-50 border-rose-200 text-rose-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`} role="status">{msg.text}</div>}
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 text-sm text-slate-500">
+          {licenceInfo ? (
+            <span>
+              Licence actuelle : <span className="font-semibold text-slate-700">{licenceInfo.etat}</span>
+              {licenceInfo.plan ? <> — plan <span className="font-semibold text-slate-700">{licenceInfo.plan}</span></> : null}
+              {" — "}
+              {licenceInfo.expires ? <>valable jusqu'au <span className="font-mono">{licenceInfo.expires}</span></> : "sans date d'expiration (perpétuelle)"}. Seul le gérant peut activer une nouvelle clé.
+            </span>
+          ) : (
+            "Lecture seule — seul le gérant peut activer une nouvelle clé de licence."
+          )}
+        </div>
+      )}
 
       {isAdmin ? (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">

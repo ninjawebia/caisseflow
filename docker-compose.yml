@@ -41,6 +41,8 @@ services:
       - ./apps/web:/repo/apps/web
       - ./packages/shared:/repo/packages/shared
       - ./infra/scripts:/repo/infra/scripts:ro
+      # Clés de licence (publique DEV pour tests) — lecture seule, jamais écrites.
+      - ./infra/keys:/repo/infra/keys:ro
       - web_node_modules:/repo/node_modules
       # Caches de build : volume nommé (performance, pas d'accès hôte requis).
       - web_next_cache:/repo/apps/web/.next

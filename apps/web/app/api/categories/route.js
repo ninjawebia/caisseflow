@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { getSessionUser, can } from "../../../lib/auth";
 import { pool } from "../../../lib/db";
 import { assertSameOrigin, json, audit } from "../../../lib/http";
+import { licenceGate } from "../../../lib/license";
 import { validateCategory } from "@caisseflow/shared";
 
 // GET /api/categories — list with article counts (BO-1, menu permission).
@@ -26,6 +27,10 @@ export async function POST(req) {
   if (csrf) return csrf;
   const user = await getSessionUser(await cookies());
   if (!user || !can(user.role, "menu") || !user.restaurantId) return json({ error: "Accès refusé" }, 403);
+  // Gate licence : écritures refusées si expirée/bloquée (lecture OK, LIC-4).
+  const lic = await licenceGate(user.restaurantId);
+  if (!lic.ok) return json({ error: lic.error }, 403);
+
 
   const body = await req.json().catch(() => null);
   const v = validateCategory(body);

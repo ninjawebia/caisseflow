@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { getSessionUser, can } from "../../../../lib/auth";
 import { pool } from "../../../../lib/db";
 import { assertSameOrigin, json, audit } from "../../../../lib/http";
+import { licenceGate } from "../../../../lib/license";
 import { validateCategory } from "@caisseflow/shared";
 
 // Chargement de la catégorie du restaurant de l'utilisateur (menu perm).
@@ -21,6 +22,10 @@ export async function PATCH(req, { params }) {
   if (csrf) return csrf;
   const user = await getSessionUser(await cookies());
   if (!user || !can(user.role, "menu") || !user.restaurantId) return json({ error: "Accès refusé" }, 403);
+  // Gate licence : écritures refusées si expirée/bloquée (lecture OK, LIC-4).
+  const lic = await licenceGate(user.restaurantId);
+  if (!lic.ok) return json({ error: lic.error }, 403);
+
 
   const cat = await loadCategory(params.id, user.restaurantId);
   if (!cat) return json({ error: "Catégorie introuvable" }, 404);
@@ -66,6 +71,10 @@ export async function DELETE(req, { params }) {
   if (csrf) return csrf;
   const user = await getSessionUser(await cookies());
   if (!user || !can(user.role, "menu") || !user.restaurantId) return json({ error: "Accès refusé" }, 403);
+  // Gate licence : écritures refusées si expirée/bloquée (lecture OK, LIC-4).
+  const lic = await licenceGate(user.restaurantId);
+  if (!lic.ok) return json({ error: lic.error }, 403);
+
 
   const cat = await loadCategory(params.id, user.restaurantId);
   if (!cat) return json({ error: "Catégorie introuvable" }, 404);

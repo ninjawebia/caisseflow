@@ -60,7 +60,7 @@ function cookieOptions() {
 // admin_plateforme (PRD 3.2 RBAC matrix).
 function can(role, permission) {
   const matrix = {
-    gerant: ["reports", "menu", "users", "tables", "journal", "exports", "ticket", "licence_read", "audit"],
+    gerant: ["reports", "menu", "users", "tables", "journal", "exports", "ticket", "licence_read", "licence_admin", "audit"],
     expert_comptable: ["reports", "journal", "exports", "audit"],
     auditeur: ["reports", "journal", "exports", "audit"],
     admin_plateforme: ["licence", "audit", "reports"],

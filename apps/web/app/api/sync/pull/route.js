@@ -1,4 +1,5 @@
 import { deviceAuth, syncAllowed } from "../../../../lib/device";
+import { licenceGate } from "../../../../lib/license";
 import { pool } from "../../../../lib/db";
 import { json } from "../../../../lib/http";
 
@@ -8,6 +9,11 @@ import { json } from "../../../../lib/http";
 export async function POST(req) {
   const device = await deviceAuth(req);
   if (!device) return json({ error: "Jeton d'appareil invalide" }, 401);
+
+  // Licence expirée/bloquée → le pull est suspendu (la caisse locale continue
+  // hors ligne jusqu'à épuisement de sa grâce, SYNC-6, jamais de perte).
+  const gate = await licenceGate(device.restaurantId);
+  if (!gate.ok) return json({ error: gate.error }, 403);
 
   // Reference data stays available during grace1 (reminders only). Sync of
   // fiscal entries is what grace2 suspends — reference pull remains minimal.
