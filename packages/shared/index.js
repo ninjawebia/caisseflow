@@ -66,6 +66,15 @@ function validateUserMobile(body) {
   return { ok: true, value: { matricule, nom, role, pin } };
 }
 
+// --- DTO catégorie (BO-1, backlog F1) ---
+function validateCategory(body) {
+  const nom = String(body?.nom || "").trim();
+  const position = body?.position === undefined ? 0 : Number(body.position);
+  if (nom.length < 2 || nom.length > 40) return { ok: false, error: "Nom de catégorie obligatoire (2–40 caractères)" };
+  if (!(Number.isInteger(position) && position >= 0 && position <= 999)) return { ok: false, error: "Position invalide (entier 0–999)" };
+  return { ok: true, value: { nom, position } };
+}
+
 module.exports = {
   NF525_EVENT_TYPES,
   EVENT_TYPES_WITH_VALIDATOR,
@@ -75,4 +84,5 @@ module.exports = {
   validateArticle,
   validateTable,
   validateUserMobile,
+  validateCategory,
 };

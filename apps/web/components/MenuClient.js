@@ -1,14 +1,30 @@
 "use client";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 // Menu management (S-03). Gérant only (PRD 3.2). All mutations go through the
 // API which re-validates server-side and writes the audit trail (BO-1).
+// Backlog F1 : panneau catégories (créer / renommer / archiver / supprimer si
+// vide) — BLUEPRINT § 9.1 ; suppression refusée par l'API si catégorie non vide.
 export default function MenuClient({ categories, articles }) {
   const [items, setItems] = useState(articles);
+  const [cats, setCats] = useState(categories);
   const [editing, setEditing] = useState(null);
   const [msg, setMsg] = useState(null); // {tone, text}
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ nom: "", prix: "", tva: "10", categorie: categories[0]?.id || "", actif: true });
+
+  // --- État du panneau catégories (F1) ---
+  const [catBusy, setCatBusy] = useState(false);
+  const [catMsg, setCatMsg] = useState(null);
+  const [newCat, setNewCat] = useState("");
+  const [catEditing, setCatEditing] = useState(null); // {id, nom}
+  const [catConfirm, setCatConfirm] = useState(null); // id en attente de confirmation
+
+  // Compteurs d'articles recalculés localement (source : items en cours).
+  const counts = useMemo(
+    () => items.reduce((m, a) => { if (a.categorie_id) m[a.categorie_id] = (m[a.categorie_id] || 0) + 1; return m; }, {}),
+    [items]
+  );
 
   function resetForm() {
     setForm({ nom: "", prix: "", tva: "10", categorie: categories[0]?.id || "", actif: true });
@@ -71,9 +87,77 @@ export default function MenuClient({ categories, articles }) {
     document.getElementById("article-form").scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
+  // --- Actions catégories (F1) ---
+  async function catSend(url, method, body) {
+    setCatBusy(true);
+    setCatMsg(null);
+    try {
+      const r = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        setCatMsg({ tone: "danger", text: data.error || "Opération refusée" });
+        return false;
+      }
+      return data;
+    } catch {
+      setCatMsg({ tone: "danger", text: "Serveur indisponible — réessayez" });
+      return false;
+    } finally {
+      setCatBusy(false);
+    }
+  }
+
+  async function createCat(e) {
+    e.preventDefault();
+    const res = await catSend("/api/categories", "POST", { nom: newCat.trim() });
+    if (!res) return;
+    setCats((prev) => [...prev, { ...res.category, nb_articles: 0 }]);
+    setNewCat("");
+    setCatMsg({ tone: "success", text: "Catégorie créée" });
+  }
+
+  async function renameCat(e) {
+    e.preventDefault();
+    if (!catEditing) return;
+    const nom = catEditing.nom.trim();
+    if (nom.length < 2) return setCatMsg({ tone: "danger", text: "Nom de catégorie obligatoire (2–40 caractères)" });
+    const res = await catSend(`/api/categories/${catEditing.id}`, "PATCH", { nom });
+    if (!res) return;
+    setCats((prev) => prev.map((c) => (c.id === catEditing.id ? res.category : c)));
+    setCatEditing(null);
+    setCatMsg({ tone: "success", text: "Catégorie renommée" });
+  }
+
+  async function toggleArchive(c) {
+    const res = await catSend(`/api/categories/${c.id}`, "PATCH", { actif: !c.actif });
+    if (!res) return;
+    setCats((prev) => prev.map((x) => (x.id === c.id ? res.category : x)));
+    setCatMsg({ tone: "success", text: res.category.actif ? "Catégorie restaurée" : "Catégorie archivée" });
+  }
+
+  async function deleteCat(c) {
+    if (catConfirm !== c.id) {
+      setCatConfirm(c.id); // double-étape : le bouton devient « Confirmer »
+      return;
+    }
+    setCatConfirm(null);
+    const res = await catSend(`/api/categories/${c.id}`, "DELETE", {});
+    if (!res) return;
+    setCats((prev) => prev.filter((x) => x.id !== c.id));
+    if (form.categorie === c.id) setForm((f) => ({ ...f, categorie: "" }));
+    setCatMsg({ tone: "success", text: "Catégorie supprimée" });
+  }
+
+  // Sélecteur d'article : catégories actives + celle de l'article en cours d'édition.
+  const selectableCats = cats.filter((c) => c.actif || c.id === form.categorie);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-      <section id="article-form" className="lg:col-span-2">
+      <section id="article-form" className="lg:col-span-2 flex flex-col gap-6">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
           <h2 className="text-lg font-semibold text-slate-900 mb-4">{editing ? "Modifier l'article" : "Nouvel article"}</h2>
           <form onSubmit={save} className="flex flex-col gap-4" data-form="article">
@@ -101,14 +185,14 @@ export default function MenuClient({ categories, articles }) {
               <select id="a-cat" value={form.categorie} onChange={(e) => setForm({ ...form, categorie: e.target.value })}
                 className="h-10 w-full px-3 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-1 transition-shadow">
                 <option value="">— Aucune —</option>
-                {categories.map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
+                {selectableCats.map((c) => <option key={c.id} value={c.id}>{c.nom}{!c.actif ? " (archivée)" : ""}</option>)}
               </select>
             </div>
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input type="checkbox" checked={form.actif} onChange={(e) => setForm({ ...form, actif: e.target.checked })} className="h-4 w-4 rounded border-slate-300" />
               Article actif (visible sur la caisse)
             </label>
-            {msg && <div className={`text-sm p-3 rounded-xl border ${msg.tone === "danger" ? "bg-rose-50 border-rose-200 text-rose-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`}>{msg.text}</div>}
+            {msg && <div className={`text-sm p-3 rounded-xl border ${msg.tone === "danger" ? "bg-rose-50 border-rose-200 text-rose-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`} role="status">{msg.text}</div>}
             <div className="flex gap-2">
               <button type="submit" disabled={busy} data-action="save-article"
                 className="h-10 px-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-medium rounded-lg transition-[transform,colors] duration-150 disabled:opacity-50 disabled:pointer-events-none">
@@ -120,6 +204,62 @@ export default function MenuClient({ categories, articles }) {
               )}
             </div>
           </form>
+        </div>
+
+        {/* --- Panneau catégories (backlog F1, BLUEPRINT § 9.1) --- */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-slate-900">Catégories</h2>
+          <p className="text-xs text-slate-500 mt-0.5 mb-4">Organisation de la carte — propagée aux tablettes au prochain sync.</p>
+          <form onSubmit={createCat} className="flex gap-2 mb-4" data-form="category">
+            <label htmlFor="cat-nom" className="sr-only">Nouvelle catégorie</label>
+            <input id="cat-nom" value={newCat} onChange={(e) => setNewCat(e.target.value)} placeholder="Nouvelle catégorie…"
+              maxLength={40} required
+              className="h-10 flex-1 px-3 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-1 transition-shadow" />
+            <button type="submit" disabled={catBusy || newCat.trim().length < 2} data-action="create-category"
+              className="h-10 px-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:pointer-events-none">+</button>
+          </form>
+
+          {cats.length === 0 ? (
+            <p className="text-sm text-slate-500 py-4 text-center">Aucune catégorie — créez la première ci-dessus.</p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-slate-100">
+              {cats.map((c) => (
+                <li key={c.id} className={`py-2 flex items-center gap-2 ${!c.actif ? "opacity-50" : ""}`}>
+                  {catEditing?.id === c.id ? (
+                    <form onSubmit={renameCat} className="flex-1 flex gap-2">
+                      <label htmlFor={`cat-edit-${c.id}`} className="sr-only">Renommer la catégorie</label>
+                      <input id={`cat-edit-${c.id}`} autoFocus value={catEditing.nom}
+                        onChange={(e) => setCatEditing({ ...catEditing, nom: e.target.value })} maxLength={40} required
+                        className="h-8 flex-1 px-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" />
+                      <button type="submit" disabled={catBusy} data-action="save-category"
+                        className="px-2 text-xs font-medium text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">Enregistrer</button>
+                      <button type="button" onClick={() => setCatEditing(null)}
+                        className="px-2 text-xs font-medium text-slate-500 hover:bg-slate-50 rounded-lg transition-colors">Annuler</button>
+                    </form>
+                  ) : (
+                    <>
+                      <span className="flex-1 text-sm text-slate-900 truncate" title={c.nom}>{c.nom}</span>
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 tabular-nums" title={`${counts[c.id] || 0} article(s) rattaché(s)`}>
+                        {counts[c.id] || 0}
+                      </span>
+                      {!c.actif && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500 border border-slate-200">Archivée</span>}
+                      <button onClick={() => setCatEditing({ id: c.id, nom: c.nom })} data-action={`cat-edit-${c.id}`}
+                        className="px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">Modifier</button>
+                      <button onClick={() => toggleArchive(c)} data-action={`cat-archive-${c.id}`}
+                        className="px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50 rounded-lg transition-colors">
+                        {c.actif ? "Archiver" : "Restaurer"}
+                      </button>
+                      <button onClick={() => deleteCat(c)} data-action={`cat-delete-${c.id}`}
+                        className={`px-2 py-1 text-xs font-medium rounded-lg transition-colors ${catConfirm === c.id ? "bg-rose-600 text-white hover:bg-rose-700" : "text-rose-700 hover:bg-rose-50"}`}>
+                        {catConfirm === c.id ? "Confirmer ?" : "Supprimer"}
+                      </button>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {catMsg && <div className={`text-sm p-3 mt-3 rounded-xl border ${catMsg.tone === "danger" ? "bg-rose-50 border-rose-200 text-rose-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`} role="status">{catMsg.text}</div>}
         </div>
       </section>
 

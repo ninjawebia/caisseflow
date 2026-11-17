@@ -33,6 +33,7 @@ export interface DtoResult<T> {
 export declare function validateArticle(body: unknown): DtoResult<{ nom: string; prix_ttc: number; taux_tva: TauxTva }>;
 export declare function validateTable(body: unknown): DtoResult<{ nom: string; salle: string; places: number }>;
 export declare function validateUserMobile(body: unknown): DtoResult<{ matricule: string; nom: string; role: string; pin: string }>;
+export declare function validateCategory(body: unknown): DtoResult<{ nom: string; position: number }>;
 
 export declare const NF525_EVENT_TYPES: readonly NF525EventType[];
 export declare const EVENT_TYPES_WITH_VALIDATOR: readonly ("ANNULATION" | "REMISE" | "CHANGEMENT_PRIX")[];

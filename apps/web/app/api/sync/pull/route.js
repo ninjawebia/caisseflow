@@ -15,7 +15,7 @@ export async function POST(req) {
   const sinceDate = since ? new Date(since) : new Date(0);
 
   const cats = await pool.query(
-    `SELECT id, nom, position FROM categories WHERE restaurant_id=$1 ORDER BY position`,
+    `SELECT id, nom, position FROM categories WHERE restaurant_id=$1 AND actif = true ORDER BY position`,
     [device.restaurantId]
   );
   const arts = await pool.query(

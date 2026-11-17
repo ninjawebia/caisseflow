@@ -12,7 +12,11 @@ export default async function MenuPage() {
   );
 
   const cats = await pool.query(
-    "SELECT id, nom, position FROM categories WHERE restaurant_id=$1 ORDER BY position", [user.restaurantId]
+    `SELECT c.id, c.nom, c.position, c.actif, COUNT(a.id)::int AS nb_articles
+     FROM categories c LEFT JOIN articles a ON a.categorie_id = c.id
+     WHERE c.restaurant_id = $1
+     GROUP BY c.id ORDER BY c.position, c.nom`,
+    [user.restaurantId]
   );
   const arts = await pool.query(
     `SELECT a.id, a.nom, a.prix_ttc, a.taux_tva, a.actif, a.categorie_id, c.nom AS categorie_nom
