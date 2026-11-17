@@ -11,7 +11,11 @@ export default function MenuClient({ categories, articles }) {
   const [editing, setEditing] = useState(null);
   const [msg, setMsg] = useState(null); // {tone, text}
   const [busy, setBusy] = useState(false);
+  // Prix saisi en HT — le TTC est calculé et affiché en temps réel.
   const [form, setForm] = useState({ nom: "", prix: "", tva: "10", categorie: categories[0]?.id || "", actif: true });
+  // Recherche (🔍) + tri de la liste d'articles.
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState(null); // null = ordre serveur | {key:"nom"|"cat", dir:"asc"|"desc"}
 
   // --- État du panneau catégories (F1) ---
   const [catBusy, setCatBusy] = useState(false);
@@ -26,9 +30,16 @@ export default function MenuClient({ categories, articles }) {
     [items]
   );
 
+  // Prix TTC calculé en direct depuis le HT saisi et le taux TVA choisi.
+  const ttcLive = useMemo(() => {
+    const ht = Number(form.prix) || 0;
+    return Math.round(ht * (1 + Number(form.tva) / 100) * 100) / 100;
+  }, [form.prix, form.tva]);
+
   function resetForm() {
     setForm({ nom: "", prix: "", tva: "10", categorie: categories[0]?.id || "", actif: true });
     setEditing(null);
+    setPendingPhoto(null);
   }
 
   async function send(url, method, body) {
@@ -56,9 +67,11 @@ export default function MenuClient({ categories, articles }) {
 
   async function save(e) {
     e.preventDefault();
+    // Prix saisi en HT → TTC = HT × (1 + TVA/100), arrondi au centime.
+    const ttc = Math.round((Number(form.prix) || 0) * (1 + Number(form.tva) / 100) * 100) / 100;
     const payload = {
       nom: form.nom.trim(),
-      prix_ttc: Number(form.prix),
+      prix_ttc: ttc,
       taux_tva: Number(form.tva),
       categorie_id: form.categorie || null,
       actif: form.actif,
@@ -68,8 +81,19 @@ export default function MenuClient({ categories, articles }) {
 
     const res = editing ? await send(`/api/articles/${editing}`, "PATCH", payload) : await send("/api/articles", "POST", payload);
     if (!res) return;
-    setItems((prev) => editing ? prev.map((a) => (a.id === editing ? res.article : a)) : [...prev, res.article]);
-    setMsg({ tone: "success", text: editing ? "Article modifié" : "Article créé" });
+    const article = res.article;
+    setItems((prev) => editing ? prev.map((a) => (a.id === editing ? article : a)) : [...prev, article]);
+
+    // Photo choisie AVANT la création : envoyée tout de suite au nouvel article.
+    let suffixe = "";
+    if (pendingPhoto?.file) {
+      const up = await uploadTo(article.id, pendingPhoto.file);
+      if (up.ok) {
+        setItems((prev) => prev.map((a) => (a.id === article.id ? { ...a, photo_hash: up.hash } : a)));
+        suffixe = " avec sa photo";
+      }
+    }
+    setMsg({ tone: "success", text: (editing ? "Article modifié" : "Article créé") + suffixe });
     resetForm();
   }
 
@@ -83,29 +107,44 @@ export default function MenuClient({ categories, articles }) {
   // --- Photo d'article (backlog F2, BLUEPRINT § 9.2) — gérant, multipart ---
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoMsg, setPhotoMsg] = useState(null);
+  // Photo sélectionnée pendant la CRÉATION (l'article n'existe pas encore) —
+  // stockée côté client avec un aperçu, envoyée juste après le POST de création.
+  const [pendingPhoto, setPendingPhoto] = useState(null); // {file, url}
 
-  async function uploadPhoto(e) {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // réutilisable
-    if (!file || !editing) return;
+  // Envoi réel du fichier vers /api/articles/<id>/photo.
+  async function uploadTo(articleId, file) {
     setPhotoBusy(true);
     setPhotoMsg(null);
     try {
       const fd = new FormData();
       fd.append("photo", file);
-      const r = await fetch(`/api/articles/${editing}/photo`, { method: "POST", body: fd });
+      const r = await fetch(`/api/articles/${articleId}/photo`, { method: "POST", body: fd });
       const data = await r.json().catch(() => ({}));
       if (!r.ok) {
         setPhotoMsg({ tone: "danger", text: data.error || "Téléversement refusé" });
-        return;
+        return { ok: false };
       }
-      setItems((prev) => prev.map((a) => (a.id === editing ? { ...a, photo_hash: data.hash } : a)));
       setPhotoMsg({ tone: "success", text: "Photo enregistrée" });
+      return { ok: true, hash: data.hash };
     } catch {
       setPhotoMsg({ tone: "danger", text: "Serveur indisponible — réessayez" });
+      return { ok: false };
     } finally {
       setPhotoBusy(false);
     }
+  }
+
+  // En édition : envoi immédiat. En création : stocké en attente (aperçu local).
+  function pickPhoto(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // réutilisable
+    if (!file) return;
+    if (editing) uploadTo(editing, file);
+    else setPendingPhoto((p) => { if (p?.url) URL.revokeObjectURL(p.url); return { file, url: URL.createObjectURL(file) }; });
+  }
+
+  function dropPendingPhoto() {
+    setPendingPhoto((p) => { if (p?.url) URL.revokeObjectURL(p.url); return null; });
   }
 
   async function deletePhoto() {
@@ -129,7 +168,10 @@ export default function MenuClient({ categories, articles }) {
 
   function startEdit(a) {
     setEditing(a.id);
-    setForm({ nom: a.nom, prix: String(a.prix_ttc), tva: String(a.taux_tva), categorie: a.categorie_id || "", actif: a.actif });
+    // Champ prix = HT (le TTC affiché en direct est recalculé à l'identique).
+    const ht = Math.round((Number(a.prix_ttc) / (1 + Number(a.taux_tva) / 100)) * 100) / 100;
+    setForm({ nom: a.nom, prix: String(ht), tva: String(a.taux_tva), categorie: a.categorie_id || "", actif: a.actif });
+    setPendingPhoto(null);
     setMsg(null);
     document.getElementById("article-form").scrollIntoView({ behavior: "smooth", block: "center" });
   }
@@ -202,6 +244,27 @@ export default function MenuClient({ categories, articles }) {
   // Sélecteur d'article : catégories actives + celle de l'article en cours d'édition.
   const selectableCats = cats.filter((c) => c.actif || c.id === form.categorie);
 
+  // Liste filtrée (recherche 🔍, accents ignorés) puis triée (en-têtes cliquables).
+  const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const visibleItems = useMemo(() => {
+    const q = norm(query.trim());
+    let list = items.filter((a) => !q || norm(a.nom).includes(q) || norm(a.categorie_nom).includes(q));
+    if (sort) {
+      const dir = sort.dir === "asc" ? 1 : -1;
+      list = [...list].sort((x, y) => {
+        const kx = sort.key === "nom" ? norm(x.nom) : norm(x.categorie_nom);
+        const ky = sort.key === "nom" ? norm(y.nom) : norm(y.categorie_nom);
+        return kx < ky ? -dir : kx > ky ? dir : 0;
+      });
+    }
+    return list;
+  }, [items, query, sort]);
+
+  // Clic sur l'en-tête : asc → desc → retour à l'ordre serveur.
+  function toggleSort(key) {
+    setSort((s) => (s?.key !== key ? { key, dir: "asc" } : s.dir === "asc" ? { key, dir: "desc" } : null));
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
       <section id="article-form" className="lg:col-span-2 flex flex-col gap-6">
@@ -215,7 +278,7 @@ export default function MenuClient({ categories, articles }) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="a-prix" className="block text-xs font-semibold text-slate-700 mb-1">Prix TTC (€) <span className="text-rose-600">*</span></label>
+                <label htmlFor="a-prix" className="block text-xs font-semibold text-slate-700 mb-1">Prix HT (€) <span className="text-rose-600">*</span></label>
                 <input id="a-prix" type="number" step="0.01" min="0" max="10000" value={form.prix} onChange={(e) => setForm({ ...form, prix: e.target.value })} required
                   className="h-10 w-full px-3 bg-white border border-slate-300 rounded-lg text-sm font-mono tabular-nums focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-1 transition-shadow" />
               </div>
@@ -226,6 +289,11 @@ export default function MenuClient({ categories, articles }) {
                   {["0", "5.5", "10", "20"].map((t) => <option key={t} value={t}>{t} %</option>)}
                 </select>
               </div>
+            </div>
+            {/* Prix TTC calculé en temps réel pendant la saisie (HT × TVA) */}
+            <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-blue-50 border border-blue-100">
+              <span className="text-sm font-medium text-slate-600">Prix TTC (calculé)</span>
+              <span data-testid="ttc-live" className="text-lg font-semibold text-blue-700 font-mono tabular-nums">{ttcLive.toFixed(2).replace(".", ",")} €</span>
             </div>
             <div>
               <label htmlFor="a-cat" className="block text-xs font-semibold text-slate-700 mb-1">Catégorie</label>
@@ -240,35 +308,38 @@ export default function MenuClient({ categories, articles }) {
               Article actif (visible sur la caisse)
             </label>
 
-            {/* Photo de l'article (F2) — disponible une fois l'article enregistré */}
-            {editing ? (
-              <div>
-                <span className="block text-xs font-semibold text-slate-700 mb-1">Photo de l'article</span>
-                <div className="flex items-center gap-4">
-                  <div className="h-16 w-16 shrink-0 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden grid place-items-center" aria-hidden="true">
-                    {items.find((a) => a.id === editing)?.photo_hash ? (
-                      <img src={`/api/articles/${editing}/photo?v=${items.find((a) => a.id === editing)?.photo_hash?.slice(0, 8)}`} alt="" className="h-16 w-16 object-cover" />
-                    ) : (
-                      <span className="text-slate-400 text-lg font-semibold">{(form.nom || "?").charAt(0).toUpperCase()}</span>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className={`inline-flex items-center justify-center h-8 px-3 text-xs font-medium rounded-lg border transition-colors ${photoBusy ? "opacity-50 pointer-events-none border-slate-200 text-slate-400" : "border-slate-300 text-slate-700 hover:bg-slate-50 cursor-pointer"}`}>
-                      {photoBusy ? "Envoi…" : "Remplacer / Ajouter"}
-                      <input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPhoto} disabled={photoBusy} className="sr-only" data-action="photo-input" />
-                    </label>
-                    {items.find((a) => a.id === editing)?.photo_hash && (
-                      <button type="button" onClick={deletePhoto} disabled={photoBusy} data-action="photo-delete"
-                        className="h-8 px-3 text-xs font-medium text-rose-700 hover:bg-rose-50 rounded-lg transition-colors text-left">Supprimer la photo</button>
-                    )}
-                    <span className="text-xs text-slate-400">JPEG, PNG ou WebP — 2 Mo max, 2048 px max</span>
-                  </div>
+            {/* Photo de l'article (F2) — ajout possible dès la création (aperçu
+                local, upload automatique juste après l'enregistrement). */}
+            <div>
+              <span className="block text-xs font-semibold text-slate-700 mb-1">Photo de l'article</span>
+              <div className="flex items-center gap-4">
+                <div className="h-16 w-16 shrink-0 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden grid place-items-center" aria-hidden="true">
+                  {editing && items.find((a) => a.id === editing)?.photo_hash ? (
+                    <img src={`/api/articles/${editing}/photo?v=${items.find((a) => a.id === editing)?.photo_hash?.slice(0, 8)}`} alt="" className="h-16 w-16 object-cover" />
+                  ) : pendingPhoto?.url ? (
+                    <img src={pendingPhoto.url} alt="" className="h-16 w-16 object-cover" />
+                  ) : (
+                    <span className="text-slate-400 text-lg font-semibold">{(form.nom || "?").charAt(0).toUpperCase()}</span>
+                  )}
                 </div>
-                {photoMsg && <div className={`text-xs p-2 mt-2 rounded-lg border ${photoMsg.tone === "danger" ? "bg-rose-50 border-rose-200 text-rose-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`} role="status">{photoMsg.text}</div>}
+                <div className="flex flex-col gap-1">
+                  <label className={`inline-flex items-center justify-center h-8 px-3 text-xs font-medium rounded-lg border transition-colors ${photoBusy ? "opacity-50 pointer-events-none border-slate-200 text-slate-400" : "border-slate-300 text-slate-700 hover:bg-slate-50 cursor-pointer"}`}>
+                    {photoBusy ? "Envoi…" : editing && items.find((a) => a.id === editing)?.photo_hash ? "Remplacer" : "Ajouter une photo"}
+                    <input type="file" accept="image/jpeg,image/png,image/webp" onChange={pickPhoto} disabled={photoBusy} className="sr-only" data-action="photo-input" />
+                  </label>
+                  {editing && items.find((a) => a.id === editing)?.photo_hash && (
+                    <button type="button" onClick={deletePhoto} disabled={photoBusy} data-action="photo-delete"
+                      className="h-8 px-3 text-xs font-medium text-rose-700 hover:bg-rose-50 rounded-lg transition-colors text-left">Supprimer la photo</button>
+                  )}
+                  {!editing && pendingPhoto?.url && (
+                    <button type="button" onClick={dropPendingPhoto} disabled={photoBusy} data-action="photo-drop"
+                      className="h-8 px-3 text-xs font-medium text-rose-700 hover:bg-rose-50 rounded-lg transition-colors text-left">Retirer</button>
+                  )}
+                  <span className="text-xs text-slate-400">JPEG, PNG ou WebP — 2 Mo max, 2048 px max</span>
+                </div>
               </div>
-            ) : (
-              <p className="text-xs text-slate-400 -mt-1">💡 Enregistrez l'article pour pouvoir lui ajouter une photo.</p>
-            )}
+              {photoMsg && <div className={`text-xs p-2 mt-2 rounded-lg border ${photoMsg.tone === "danger" ? "bg-rose-50 border-rose-200 text-rose-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`} role="status">{photoMsg.text}</div>}
+            </div>
             {msg && <div className={`text-sm p-3 rounded-xl border ${msg.tone === "danger" ? "bg-rose-50 border-rose-200 text-rose-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`} role="status">{msg.text}</div>}
             <div className="flex gap-2">
               <button type="submit" disabled={busy} data-action="save-article"
@@ -342,21 +413,52 @@ export default function MenuClient({ categories, articles }) {
 
       <section className="lg:col-span-3">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">Carte du restaurant ({items.length})</h2>
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <h2 className="text-lg font-semibold text-slate-900 whitespace-nowrap">Carte du restaurant ({items.length})</h2>
+            {/* Recherche 🔍 — filtre temps réel sur le nom et la catégorie */}
+            <div className="relative flex-1 max-w-xs">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+              </span>
+              <input id="article-search" type="search" value={query} onChange={(e) => setQuery(e.target.value)}
+                placeholder="Rechercher un article…" aria-label="Rechercher un article"
+                className="h-10 w-full pl-9 pr-3 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-1 transition-shadow" />
+            </div>
+          </div>
           {items.length === 0 ? (
             <div className="py-12 text-center">
               <div className="bg-slate-100 rounded-full p-6 mb-4 inline-flex" aria-hidden="true">🍽️</div>
               <h3 className="text-base font-semibold text-slate-900">Aucun article</h3>
               <p className="text-sm text-slate-500 mt-1">Créez votre premier article avec le formulaire.</p>
             </div>
+          ) : visibleItems.length === 0 ? (
+            <div className="py-12 text-center">
+              <div className="bg-slate-100 rounded-full p-6 mb-4 inline-flex" aria-hidden="true">🔍</div>
+              <h3 className="text-base font-semibold text-slate-900">Aucun résultat</h3>
+              <p className="text-sm text-slate-500 mt-1">Aucun article ne correspond à « {query} ».</p>
+              <button onClick={() => setQuery("")} data-action="clear-search"
+                className="mt-3 h-9 px-3 border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg transition-colors">Effacer la recherche</button>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs font-medium text-slate-500 border-b border-slate-200">
-                    <th className="py-2 pr-4 w-12"><span className="sr-only">Photo</span></th>
-                    <th className="py-2 pr-4">Article</th>
-                    <th className="py-2 pr-4">Catégorie</th>
+                    <th className="py-2 pr-4 w-14"><span className="sr-only">Photo</span></th>
+                    <th className="py-2 pr-4" aria-sort={sort?.key === "nom" ? (sort.dir === "asc" ? "ascending" : "descending") : undefined}>
+                      <button onClick={() => toggleSort("nom")} data-action="sort-nom"
+                        className="inline-flex items-center gap-1 hover:text-slate-900 transition-colors">
+                        Article
+                        <span className="text-slate-400" aria-hidden="true">{sort?.key === "nom" ? (sort.dir === "asc" ? "▲" : "▼") : "⇅"}</span>
+                      </button>
+                    </th>
+                    <th className="py-2 pr-4" aria-sort={sort?.key === "cat" ? (sort.dir === "asc" ? "ascending" : "descending") : undefined}>
+                      <button onClick={() => toggleSort("cat")} data-action="sort-cat"
+                        className="inline-flex items-center gap-1 hover:text-slate-900 transition-colors">
+                        Catégorie
+                        <span className="text-slate-400" aria-hidden="true">{sort?.key === "cat" ? (sort.dir === "asc" ? "▲" : "▼") : "⇅"}</span>
+                      </button>
+                    </th>
                     <th className="py-2 pr-4 text-right">Prix TTC</th>
                     <th className="py-2 pr-4 text-right">TVA</th>
                     <th className="py-2 pr-4 text-center">État</th>
@@ -364,13 +466,14 @@ export default function MenuClient({ categories, articles }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((a) => (
+                  {visibleItems.map((a) => (
                     <tr key={a.id} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
                       <td className="py-2 pr-4">
                         {a.photo_hash ? (
-                          <img src={`/api/articles/${a.id}/photo?v=${a.photo_hash.slice(0, 8)}`} alt="" className="h-10 w-10 rounded-lg object-cover border border-slate-200" />
+                          <img src={`/api/articles/${a.id}/photo?v=${a.photo_hash.slice(0, 8)}`} alt={`Photo de ${a.nom}`}
+                            className="h-12 w-12 rounded-xl object-cover border border-slate-200 shadow-sm" />
                         ) : (
-                          <span className="grid h-10 w-10 place-items-center rounded-lg bg-slate-100 border border-slate-200 text-slate-400 text-sm font-semibold" aria-hidden="true">{a.nom.charAt(0).toUpperCase()}</span>
+                          <span className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 border border-slate-200 text-slate-400 text-sm font-semibold shadow-inner" aria-hidden="true">{a.nom.charAt(0).toUpperCase()}</span>
                         )}
                       </td>
                       <td className="py-2 pr-4 text-slate-900">{a.nom}</td>

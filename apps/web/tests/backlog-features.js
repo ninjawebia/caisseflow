@@ -189,6 +189,18 @@ async function main() {
   check("TC-BO1-PHOTO-005", del.status === 200 && get2.status === 404 && db2.rows[0].photo_file === null, `HTTP ${del.status}/${get2.status}`);
 
   console.log(`\nTC-BO1-PHOTO : ${pass - p1} PASS, ${fail - f1} FAIL`);
+
+  // ============ Batterie UI /menu (SSR — améliorations v0.3) ============
+  console.log("— Batterie UI /menu (SSR) —");
+  const page2 = await fetch(`${B}/menu`, { headers: { Origin: B, Cookie: jar } });
+  const html = await page2.text();
+  const u1 = pass, u2 = fail;
+  check("TC-UI-MENU-001-recherche", page2.status === 200 && html.includes('id="article-search"') && html.includes("Rechercher un article"), "champ 🔍 présent");
+  check("TC-UI-MENU-002-tri", html.includes("sort-nom") && html.includes("sort-cat"), "en-têtes triables");
+  check("TC-UI-MENU-003-ttc-live", html.includes("ttc-live"), "affichage TTC temps réel");
+  check("TC-UI-MENU-004-photo-création", html.includes("photo-input") && html.includes("Ajouter une photo"), "zone photo dès la création");
+  console.log(`\nTC-UI-MENU : ${pass - u1} PASS, ${fail - u2} FAIL`);
+
   console.log(`\nTOTAL : ${pass} PASS, ${fail} FAIL`);
   await pool.end();
   process.exit(fail > 0 ? 1 : 0);
