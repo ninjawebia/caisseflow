@@ -80,6 +80,53 @@ export default function MenuClient({ categories, articles }) {
     setMsg({ tone: "success", text: "Article désactivé" });
   }
 
+  // --- Photo d'article (backlog F2, BLUEPRINT § 9.2) — gérant, multipart ---
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoMsg, setPhotoMsg] = useState(null);
+
+  async function uploadPhoto(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // réutilisable
+    if (!file || !editing) return;
+    setPhotoBusy(true);
+    setPhotoMsg(null);
+    try {
+      const fd = new FormData();
+      fd.append("photo", file);
+      const r = await fetch(`/api/articles/${editing}/photo`, { method: "POST", body: fd });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setPhotoMsg({ tone: "danger", text: data.error || "Téléversement refusé" });
+        return;
+      }
+      setItems((prev) => prev.map((a) => (a.id === editing ? { ...a, photo_hash: data.hash } : a)));
+      setPhotoMsg({ tone: "success", text: "Photo enregistrée" });
+    } catch {
+      setPhotoMsg({ tone: "danger", text: "Serveur indisponible — réessayez" });
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  async function deletePhoto() {
+    setPhotoBusy(true);
+    setPhotoMsg(null);
+    try {
+      const r = await fetch(`/api/articles/${editing}/photo`, { method: "DELETE", headers: { "Content-Type": "application/json" } });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setPhotoMsg({ tone: "danger", text: data.error || "Suppression refusée" });
+        return;
+      }
+      setItems((prev) => prev.map((a) => (a.id === editing ? { ...a, photo_hash: null } : a)));
+      setPhotoMsg({ tone: "success", text: "Photo supprimée" });
+    } catch {
+      setPhotoMsg({ tone: "danger", text: "Serveur indisponible — réessayez" });
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
   function startEdit(a) {
     setEditing(a.id);
     setForm({ nom: a.nom, prix: String(a.prix_ttc), tva: String(a.taux_tva), categorie: a.categorie_id || "", actif: a.actif });
@@ -192,6 +239,36 @@ export default function MenuClient({ categories, articles }) {
               <input type="checkbox" checked={form.actif} onChange={(e) => setForm({ ...form, actif: e.target.checked })} className="h-4 w-4 rounded border-slate-300" />
               Article actif (visible sur la caisse)
             </label>
+
+            {/* Photo de l'article (F2) — disponible une fois l'article enregistré */}
+            {editing ? (
+              <div>
+                <span className="block text-xs font-semibold text-slate-700 mb-1">Photo de l'article</span>
+                <div className="flex items-center gap-4">
+                  <div className="h-16 w-16 shrink-0 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden grid place-items-center" aria-hidden="true">
+                    {items.find((a) => a.id === editing)?.photo_hash ? (
+                      <img src={`/api/articles/${editing}/photo?v=${items.find((a) => a.id === editing)?.photo_hash?.slice(0, 8)}`} alt="" className="h-16 w-16 object-cover" />
+                    ) : (
+                      <span className="text-slate-400 text-lg font-semibold">{(form.nom || "?").charAt(0).toUpperCase()}</span>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className={`inline-flex items-center justify-center h-8 px-3 text-xs font-medium rounded-lg border transition-colors ${photoBusy ? "opacity-50 pointer-events-none border-slate-200 text-slate-400" : "border-slate-300 text-slate-700 hover:bg-slate-50 cursor-pointer"}`}>
+                      {photoBusy ? "Envoi…" : "Remplacer / Ajouter"}
+                      <input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPhoto} disabled={photoBusy} className="sr-only" data-action="photo-input" />
+                    </label>
+                    {items.find((a) => a.id === editing)?.photo_hash && (
+                      <button type="button" onClick={deletePhoto} disabled={photoBusy} data-action="photo-delete"
+                        className="h-8 px-3 text-xs font-medium text-rose-700 hover:bg-rose-50 rounded-lg transition-colors text-left">Supprimer la photo</button>
+                    )}
+                    <span className="text-xs text-slate-400">JPEG, PNG ou WebP — 2 Mo max, 2048 px max</span>
+                  </div>
+                </div>
+                {photoMsg && <div className={`text-xs p-2 mt-2 rounded-lg border ${photoMsg.tone === "danger" ? "bg-rose-50 border-rose-200 text-rose-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`} role="status">{photoMsg.text}</div>}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 -mt-1">💡 Enregistrez l'article pour pouvoir lui ajouter une photo.</p>
+            )}
             {msg && <div className={`text-sm p-3 rounded-xl border ${msg.tone === "danger" ? "bg-rose-50 border-rose-200 text-rose-700" : "bg-emerald-50 border-emerald-200 text-emerald-700"}`} role="status">{msg.text}</div>}
             <div className="flex gap-2">
               <button type="submit" disabled={busy} data-action="save-article"
@@ -277,6 +354,7 @@ export default function MenuClient({ categories, articles }) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs font-medium text-slate-500 border-b border-slate-200">
+                    <th className="py-2 pr-4 w-12"><span className="sr-only">Photo</span></th>
                     <th className="py-2 pr-4">Article</th>
                     <th className="py-2 pr-4">Catégorie</th>
                     <th className="py-2 pr-4 text-right">Prix TTC</th>
@@ -288,6 +366,13 @@ export default function MenuClient({ categories, articles }) {
                 <tbody>
                   {items.map((a) => (
                     <tr key={a.id} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
+                      <td className="py-2 pr-4">
+                        {a.photo_hash ? (
+                          <img src={`/api/articles/${a.id}/photo?v=${a.photo_hash.slice(0, 8)}`} alt="" className="h-10 w-10 rounded-lg object-cover border border-slate-200" />
+                        ) : (
+                          <span className="grid h-10 w-10 place-items-center rounded-lg bg-slate-100 border border-slate-200 text-slate-400 text-sm font-semibold" aria-hidden="true">{a.nom.charAt(0).toUpperCase()}</span>
+                        )}
+                      </td>
                       <td className="py-2 pr-4 text-slate-900">{a.nom}</td>
                       <td className="py-2 pr-4 text-slate-500">{a.categorie_nom || "—"}</td>
                       <td className="py-2 pr-4 text-right font-mono tabular-nums">{Number(a.prix_ttc).toFixed(2)} €</td>

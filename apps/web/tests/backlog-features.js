@@ -98,7 +98,98 @@ async function main() {
   );
   check("TC-BO1-CAT-010-audit", audits.rows[0].n >= 4, `${audits.rows[0].n} traces audit_log`);
 
-  console.log(`\nTC-BO1-CAT : ${pass} PASS, ${fail} FAIL`);
+  const p1 = pass, f1 = fail;
+  console.log(`\nTC-BO1-CAT : ${p1} PASS, ${f1} FAIL`);
+
+  // ============ Batterie TC-BO1-PHOTO (backlog F2) ============
+  console.log("— Batterie TC-BO1-PHOTO (backlog F2) —");
+  const uploadsLib = require("../lib/uploads");
+  const fs = require("fs");
+  const crypto = require("crypto");
+
+  // PNG 1×1 valide (base64 canonique)
+  const PNG1x1 = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+    "base64"
+  );
+  // Pseudo-PNG avec IHDR 3000×3000 (magic bytes OK, dimensions excessives)
+  const bigHdr = Buffer.alloc(33);
+  bigHdr.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+  bigHdr.writeUInt32BE(13, 8); bigHdr.write("IHDR", 12);
+  bigHdr.writeUInt32BE(3000, 16); bigHdr.writeUInt32BE(3000, 20);
+  bigHdr.set(Buffer.from([0x08, 0x06, 0x00, 0x00, 0x00]), 24);
+  // Faux JPEG renommé : un PDF (magic bytes %PDF) portant l'extension .jpg
+  const pdfRenamed = Buffer.concat([Buffer.from("%PDF-1.7 fake"), crypto.randomBytes(64)]);
+
+  const art2 = await fetch(`${B}/api/articles`, { method: "POST", headers: H(jar), body: JSON.stringify({ nom: `Article photo ${SFX}`, prix_ttc: 8, taux_tva: 10, actif: true }) });
+  if (art2.status !== 201) throw new Error(`article2 → ${art2.status}`);
+  const art2id = (await art2.json()).article.id;
+  const before = await pool.query("SELECT COUNT(*)::int AS n FROM journal_replica");
+  const up = (buf, name) => {
+    const fd = new FormData();
+    fd.append("photo", new Blob([buf]), name);
+    return fetch(`${B}/api/articles/${art2id}/photo`, { method: "POST", headers: { Origin: B, Cookie: jar }, body: fd });
+  };
+
+  // TC-BO1-PHOTO-002 : PDF renommé .jpg → refusé (magic bytes)
+  const pdf = await up(pdfRenamed, "fake.jpg");
+  check("TC-BO1-PHOTO-002", pdf.status === 400, `HTTP ${pdf.status}`);
+
+  // TC-BO1-PHOTO-003 : > 2 Mo + dimensions > 2048 px
+  const big = await up(Buffer.concat([PNG1x1, crypto.randomBytes(2 * 1024 * 1024)]), "big.png");
+  const dims = await up(bigHdr, "3000.png");
+  check("TC-BO1-PHOTO-003", big.status === 400 && dims.status === 400, `HTTP ${big.status}/${dims.status}`);
+
+  // TC-BO1-PHOTO-009 : nom client malveillant → ignoré (nom UUID serveur)
+  const evil = await up(PNG1x1, "../../evil.php");
+  const dirList = fs.readdirSync(uploadsLib.uploadDir()).join(" ");
+  check("TC-BO1-PHOTO-009", evil.status === 201 && !dirList.includes("evil"), "nom UUID généré");
+
+  // TC-BO1-PHOTO-001 : upload valide → 201 + GET 200 + ETag/304
+  const ok1 = await up(PNG1x1, "photo.png");
+  const ok1b = await ok1.json().catch(() => ({}));
+  check("TC-BO1-PHOTO-001", ok1.status === 201 && ok1b.hash, `HTTP ${ok1.status}`);
+  const get1 = await fetch(`${B}/api/articles/${art2id}/photo`, { headers: { Origin: B, Cookie: jar } });
+  const etag = get1.headers.get("etag");
+  check("TC-BO1-PHOTO-001b", get1.status === 200 && get1.headers.get("content-type") === "image/png" && !!etag, `HTTP ${get1.status} ${get1.headers.get("content-type")}`);
+  const get304 = await fetch(`${B}/api/articles/${art2id}/photo`, { headers: { Origin: B, Cookie: jar, "If-None-Match": etag } });
+  check("TC-BO1-PHOTO-001c", get304.status === 304, `HTTP ${get304.status}`);
+
+  // TC-BO1-PHOTO-006 : comptable → 403
+  const fd2 = new FormData();
+  fd2.append("photo", new Blob([PNG1x1]), "x.png");
+  const forb = await fetch(`${B}/api/articles/${art2id}/photo`, { method: "POST", headers: { Origin: B, Cookie: jarC }, body: fd2 });
+  check("TC-BO1-PHOTO-006", forb.status === 403, `HTTP ${forb.status}`);
+
+  // TC-BO1-PHOTO-007 : GET sans authentification → 403 ; avec jeton appareil → 200
+  const noAuth = await fetch(`${B}/api/articles/${art2id}/photo`);
+  const device = await fetch(`${B}/api/articles/${art2id}/photo`, { headers: { Authorization: "Bearer device-token-demo-POSTE-01" } });
+  check("TC-BO1-PHOTO-007", noAuth.status === 403 && device.status === 200, `HTTP ${noAuth.status}/${device.status}`);
+
+  // TC-BO1-PHOTO-008 : sync pull expose photo_hash
+  const pull2 = await fetch(`${B}/api/sync/pull`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer device-token-demo-POSTE-01" }, body: "{}" });
+  const pull2b = await pull2.json().catch(() => ({}));
+  const inPull = (pull2b.articles || []).find((a) => a.id === art2id);
+  check("TC-BO1-PHOTO-008", pull2.status === 200 && inPull && typeof inPull.photo_hash === "string", "photo_hash dans le sync pull");
+
+  // TC-BO1-PHOTO-004 : remplacement → ancienne photo archivée
+  const PNG2x2 = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVR42mNkYPhfz0BEYBxVmgEAAVoB7TG6CJ8AAAAASUVORK5CYII=", "base64");
+  const rep = await up(PNG2x2, "v2.png");
+  const archived = fs.readdirSync(require("path").join(uploadsLib.uploadDir(), "archived")).length;
+  check("TC-BO1-PHOTO-004", rep.status === 201 && archived >= 1, `${archived} fichier(s) archivé(s)`);
+
+  // TC-BO1-PHOTO-010 : aucune écriture journal_replica (invariant NF525)
+  const after = await pool.query("SELECT COUNT(*)::int AS n FROM journal_replica");
+  check("TC-BO1-PHOTO-010", after.rows[0].n === before.rows[0].n, `journal ${before.rows[0].n} → ${after.rows[0].n}`);
+
+  // TC-BO1-PHOTO-005 : suppression → GET 404, champ NULL
+  const del = await fetch(`${B}/api/articles/${art2id}/photo`, { method: "DELETE", headers: { "Content-Type": "application/json", Origin: B, Cookie: jar }, body: "{}" });
+  const get2 = await fetch(`${B}/api/articles/${art2id}/photo`, { headers: { Origin: B, Cookie: jar } });
+  const db2 = await pool.query("SELECT photo_file, photo_hash FROM articles WHERE id = $1", [art2id]);
+  check("TC-BO1-PHOTO-005", del.status === 200 && get2.status === 404 && db2.rows[0].photo_file === null, `HTTP ${del.status}/${get2.status}`);
+
+  console.log(`\nTC-BO1-PHOTO : ${pass - p1} PASS, ${fail - f1} FAIL`);
+  console.log(`\nTOTAL : ${pass} PASS, ${fail} FAIL`);
   await pool.end();
   process.exit(fail > 0 ? 1 : 0);
 }

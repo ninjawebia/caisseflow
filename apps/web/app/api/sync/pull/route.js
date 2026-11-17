@@ -19,7 +19,7 @@ export async function POST(req) {
     [device.restaurantId]
   );
   const arts = await pool.query(
-    `SELECT id, categorie_id, nom, prix_ttc, taux_tva, actif, version, updated_at
+    `SELECT id, categorie_id, nom, prix_ttc, taux_tva, actif, version, photo_hash, updated_at
      FROM articles WHERE restaurant_id=$1 AND updated_at > $2 ORDER BY nom`,
     [device.restaurantId, sinceDate]
   );

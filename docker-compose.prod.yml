@@ -20,6 +20,9 @@ services:
       DATABASE_URL: ${DATABASE_URL}          # .env.prod / secret Dokploy
       APP_ORIGIN: ${APP_ORIGIN}              # ex. https://caisseflow.example.com
       NODE_ENV: production
+      UPLOAD_DIR: /data/uploads
+    volumes:
+      - web_uploads:/data/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -67,6 +70,7 @@ networks:
     driver: bridge
 
 volumes:
+  web_uploads:
   caisseflow_pgdata_prod:
   caddy_data:
   caddy_config:

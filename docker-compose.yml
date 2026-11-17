@@ -48,6 +48,9 @@ services:
       - ./output/exports:/repo/output/exports
       - ./output/reports:/repo/output/reports
       - ./logs:/repo/apps/web/logs
+      # Photos d'articles : données applicatives → volume Docker (jamais l'hôte,
+      # cf. README « Arborescence et fichiers modifiables »).
+      - web_uploads:/repo/apps/web/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -103,4 +106,5 @@ volumes:
   caisseflow_pgdata:
   web_node_modules:
   web_next_cache:
+  web_uploads:
   gradle_cache:

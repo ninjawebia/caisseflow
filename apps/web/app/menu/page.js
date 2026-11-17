@@ -19,7 +19,7 @@ export default async function MenuPage() {
     [user.restaurantId]
   );
   const arts = await pool.query(
-    `SELECT a.id, a.nom, a.prix_ttc, a.taux_tva, a.actif, a.categorie_id, c.nom AS categorie_nom
+    `SELECT a.id, a.nom, a.prix_ttc, a.taux_tva, a.actif, a.categorie_id, a.photo_hash, c.nom AS categorie_nom
      FROM articles a LEFT JOIN categories c ON c.id = a.categorie_id
      WHERE a.restaurant_id=$1 ORDER BY c.position NULLS LAST, a.nom`,
     [user.restaurantId]
