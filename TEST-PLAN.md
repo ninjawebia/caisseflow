@@ -476,3 +476,25 @@ Chaque cas porte : **ID**, **titre**, **module**, **exigence PRD liée**, **prio
 ### 21.3 Non-régression associée
 
 - TC-REG-nouveau : après implémentation, rejouer les cas BO existants (articles CRUD, sync pull, exports) + `make smoke` — les migrations 0005 (`actif` catégories) et 0006 (`photo_file`/`photo_hash`, **pas** `photo_url`) doivent rester idempotentes et le chaînage intact. **Exécuté 2026-11-17 : `make smoke` PASS, chaînage SHA-256 vérifié intact (FISC-2 ✓), 25/25 PASS.**
+
+## 22. Activation de licence par clé signée — TC-LIC (PRD ch. 8, implémenté le 2026-11-17)
+
+> Modèle « Office » : clé signée Ed25519 vérifiée **en local** (aucun serveur de licences, coût nul). Décision opérateur : licence expirée/bloquée → **écritures refusées (403)**, consultation/journal/exports fiscaux toujours accessibles (LIC-4).
+
+| ID | Précondition | Action | Attendu | Statut |
+| --- | --- | --- | --- | --- |
+| TC-LIC-001 | Gérant | POST /api/licence/activate clé valide | `200` ; licences : etat=active, expires_at, plan, cle_id = empreinte | PASS |
+| TC-LIC-002 | Gérant | Clé avec signature altérée | `400` « signature refusée », état inchangé | PASS |
+| TC-LIC-003 | Gérant | Clé d'un autre restaurant | `400` « autre restaurant » | PASS |
+| TC-LIC-004 | Gérant | Clé expirée (exp hier) | `400` « expirée » | PASS |
+| TC-LIC-005 | Comptable | POST activate | `403` — seul le gérant | PASS |
+| TC-LIC-006 | Gérant | Réactivation (même clé) | `200` — résumé mensuel sans souci | PASS |
+| TC-LIC-007 | Licence expirée en base | POST /api/articles | `403` « Licence expirée » | PASS |
+| TC-LIC-008 | Licence expirée | POST /api/categories | `403` | PASS |
+| TC-LIC-009 | Licence expirée | POST photo | `403` | PASS |
+| TC-LIC-010 | Licence expirée | GET /api/categories (lecture) | `200` — lecture et exports jamais verrouillés | PASS |
+| TC-LIC-011 | Licence expirée | sync pull (tablette) | `403` — pull suspendu, caisse locale continue hors ligne (SYNC-6) | PASS |
+| TC-LIC-012 | Licence restaurée | POST article | `201` — reprise normale | PASS |
+| TC-LIC-013 | Après activation | audit_log | traces `licence_activate` | PASS |
+
+**Exécution du 2026-11-17** (dans le conteneur, `make test`) : **TC-LIC 13/13 PASS** — total général **42/42 PASS** (chain-check + TC-BO1-CAT 13 + TC-BO1-PHOTO 12 + TC-UI-MENU 4 + TC-LIC 13), `make smoke` PASS.

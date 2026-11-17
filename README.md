@@ -26,7 +26,7 @@ Vérification (depuis les conteneurs, pas depuis l'hôte) : `make smoke`
 apps/web        → back-office Next.js (BO + API) + lib NF525 (lib/fiscal.js, isolé)
 apps/mobile     → app Expo React Native (squelette Phase 2 ; build APK via Docker)
 packages/shared → types NF525 + DTO API partagés (web ↔ mobile)
-infra/          → scripts d'exploitation, Caddy (HTTPS), backups, Dokploy
+infra/          → scripts d'exploitation, Caddy (HTTPS), backups, Dokploy, clés de licence
 ```
 
 ## Arborescence et fichiers modifiables
@@ -86,6 +86,9 @@ variables d'environnement uniquement.
 
 ## Sécurité
 
+- Licences clients : clés signées **Ed25519** vérifiées **en local** (aucun serveur de licences, coût nul). Clé privée propriétaire via `make license-keygen` → `infra/keys/owner/` (gitignorée, JAMAIS commitée) ; en prod, définir `LICENSE_PUBLIC_KEY`. La paire commitée `infra/keys/dev/` ne vaut que pour la préprod (les clés DEV sont forgables par quiconque a le dépôt — ne pas déployer telle quelle).
+- Licence expirée/bloquée : **écritures refusées (403)** (articles, catégories, photos, sync) ; consultation, journal et **exports fiscaux toujours accessibles** (NF525 / LIC-4).
+- Photos : validation par magic bytes (jamais le nom/Content-Type client), ≤ 2 Mo, ≤ 2048 px, nom UUID serveur, volume Docker, ancienne photo archivée 30 j, ETag SHA-256.
 - Secrets : `.env` local / `.env.prod` / secrets Docker-Dokploy — **jamais commités**.
 - Journal fiscal : append-only garanti au niveau PostgreSQL (triggers), chaînage SHA-256
   vérifiable par `make chain-check`, conservation 6 ans, export de contrôle fiscal signé.

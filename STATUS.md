@@ -77,3 +77,12 @@ Anomalies constatées pendant la passe : les 403 initiaux venaient du script de 
 | F2 photos d'articles | migration `0006_articles_photo.sql` (`photo_file`/`photo_hash`, pas de `photo_url` — URL dérivée) ; `lib/uploads.js` (magic bytes JPEG/PNG/WebP, ≤ 2 Mo, ≤ 2048 px, nom UUID serveur, archivage 30 j + purge) ; `/api/articles/[id]/photo` GET (ETag SHA-256 + 304, auth session **ou** Bearer device) / POST multipart / DELETE ; volume Docker `web_uploads` (chown su-exec au démarrage, stages dev + runtime) ; sync pull `photo_hash` ; UI zone photo éditeur + vignettes grille | **TC-BO1-PHOTO 12/12 PASS — TOTAL make test 25/25 PASS** + `make smoke` PASS + chaînage intact (FISC-2 ✓) | `02d1c56` (poussé) |
 
 Correctifs pendant le cycle F2 (pièges documentés) : `params` Promise Next 15 → `(await ctx.params).id` ; volume `web_uploads` root-owned au copy-up → chown 1000:1000 via `su-exec` au démarrage ; lockfile racine régénéré (héritage bump RN 0.76.9 + expo-*) ; `detectImage` absent du `module.exports` de `lib/uploads.js` (cause du GET 500 — POST passait car `validate`/`save` étaient exportés) ; imports lib photo route en nommés.
+
+## Améliorations v0.3 (2026-11-17)
+
+| Module | Contenu | Tests | Commit |
+| --- | --- | --- | --- |
+| UI /menu (5 améliorations) | photo ajoutable dès la création (aperçu local + upload auto après POST) ; recherche 🔍 temps réel (accents ignorés) ; tri Article/Catégorie asc/desc ; prix saisi en HT avec TTC calculé en direct ; colonne photo stylée 48 px | TC-UI-MENU 4/4 → **TOTAL 29/29** | `95c7876` (poussé) |
+| Activation de licence | migration 0007 (expires_at/plan/cle_id) ; lib/license (Ed25519, verifyKey/signLicense/licenceGate) ; POST /api/licence/activate (gérant) ; gate écritures 403 (articles/catégories/photos) + sync pull suspendu ; lecture/exports OK (LIC-4) ; UI page Licence ; `make license-keygen` / `make license-gen` (clé privée owner gitignorée, paire DEV commitée pour préprod uniquement) | TC-LIC 13/13 → **TOTAL 42/42** + smoke PASS | `bbc7b27` (poussé) |
+
+Docs mises à jour dans la même passe : TEST-PLAN § 22 (13 cas PASS), README (Sécurité + arborescence), HANDOFF (§ 8 tests, § 10 limites : paire DEV).

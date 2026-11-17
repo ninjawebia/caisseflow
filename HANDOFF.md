@@ -103,6 +103,10 @@ Voir `workflow/05-handoff.md` §3 pour les alternatives.
 | 11 | Modèle de ticket | `1e2b952` | PATCH gérant OK ; comptable/admin 403 |
 | — | QA + fixes | `86b87c6` | qa-check 0 FAIL / 0 WARN |
 | — | Gate sécurité | `3df586e` | `security-audit.sh` exit 0 (20 PASS / 0 FAIL / 0 WARN) |
+| 12 | Backlog F1 — catégories | `64102ab` | TC-BO1-CAT **13/13 PASS** (CRUD gérant, comptable 403, archivage + sync, delete refusé si non vide) |
+| 13 | Backlog F2 — photos | `02d1c56` | TC-BO1-PHOTO **12/12 PASS** (magic bytes, 2 Mo/2048 px, UUID serveur, ETag 304, archivage 30 j, device Bearer 200) |
+| 14 | UI menu v0.3 | `95c7876` | TC-UI-MENU **4/4 PASS** (photo dès création, recherche, tri, TTC temps réel) |
+| 15 | Licence par clé signée | `bbc7b27` | TC-LIC **13/13 PASS** (activation, signatures refusées, gate écritures 403, sync suspendu, lecture OK) — TOTAL **42/42 PASS** |
 
 ## 9. Résumé sécurité (Phase 4.5 — `security/`)
 
@@ -134,6 +138,13 @@ Voir `workflow/05-handoff.md` §3 pour les alternatives.
   déploiement (schéma append-only déjà en place).
 - Le limiteur de débit applicatif est en mémoire : sous multi-instances, ajouter
   un limiteur partagé (le verrouillage DB par compte reste actif).
+- **Licences** : la paire `infra/keys/dev/` committée n'est valable qu'en
+  préprod (clés DEV forgables par quiconque a le dépôt). En production :
+  `make license-keygen` → monter `infra/keys/owner/public.pem` via
+  `LICENSE_PUBLIC_KEY` dans l'environnement du conteneur web (le fallback
+  charge la clé DEV). La clé privée owner n'est JAMAIS commitée.
+- Photos : archivage 30 j via répertoire `uploads/archived/` (purge au
+  passage) — le volume `web_uploads` doit être sauvegardé avec la base.
 
 ## 11. Références
 
