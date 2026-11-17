@@ -27,7 +27,7 @@ RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
     mv ${ANDROID_HOME}/cmdline-tools/cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest && \
     rm /tmp/tools.zip && \
     yes | sdkmanager --licenses > /dev/null && \
-    sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" > /dev/null
+    sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "build-tools;34.0.0" > /dev/null
 
 WORKDIR /repo
 # Dépendances (pas de lockfile commité → npm install ; réinstallées si

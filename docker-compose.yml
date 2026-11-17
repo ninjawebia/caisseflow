@@ -97,6 +97,9 @@ services:
       # Cache Gradle en volume nommé (jamais sur l'hôte — plusieurs Go, aucun
       # besoin d'y accéder ; accélère fortement les builds suivants).
       - gradle_cache:/root/.gradle
+      # SDK Android persistant : le NDK (~2,5 Go) téléchargé par Gradle au 1er
+      # build survit au conteneur éphémère (sinon re-téléchargé à chaque build).
+      - android_sdk:/opt/android-sdk
     profiles: [apk]   # ne démarre pas avec make up ; lancé par make build-apk / up-all
     networks: [caisseflow-net]
 
@@ -110,3 +113,4 @@ volumes:
   web_next_cache:
   web_uploads:
   gradle_cache:
+  android_sdk:
