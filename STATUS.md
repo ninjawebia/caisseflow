@@ -97,3 +97,15 @@ Docs mises à jour dans la même passe : TEST-PLAN § 22 (13 cas PASS), README (
 Docs mises à jour dans la même passe : TEST-PLAN § 23 (TC-MED) / § 24 (TC-TKT), PRD ch. 14.3/14.4 [IMPLÉMENTÉ v0.4], DESIGN-BLUEPRINT § 9.3/9.4, HANDOFF § 8 (modules 16/17).
 
 Pièges documentés du cycle : contenus PNG des fixtures désormais **uniques par run** (`pngUnique` = PNG + sha256 du salt, sinon la dédup réutilisait l'asset d'un run précédent référencé par un article résiduel → MED-010 400) ; batteries CAT/PHOTO/MED suppriment leurs articles de test en fin de passage (rerun-safe) ; imports `licenceGate` à profondeur 3/4/5 selon la route ; doublon `export DELETE` créé par substitution partielle (balance accolades 0 vérifiée).
+
+## Gate sécurité v0.4 (2026-11-17)
+
+| Élément | Résultat |
+| --- | --- |
+| `security-audit.sh` | **20 PASS / 0 FAIL / 0 WARN** — Gate: pass |
+| Confirmé corrigé | **SEC-003** (Low, 3.5) : paire DEV de licence versionnée dans l'historique git → **rotation** de la paire, désuivi (`git rm --cached` + `.gitignore`), génération idempotente `make license-devkey`, serveur de dev charge la clé publique du disque (priorité `LICENSE_PUBLIC_KEY` env > disque > constante) ; l'ancienne clé (historique) ne signe plus rien d'accepté ; régression TC-LIC 13/13 PASS |
+| Rejetés documentés | REJ-009 (traversée de chemin média), REJ-010 (IDOR cross-tenant média), REJ-011 (bypass validation upload) — preuves dans `security/findings.json` |
+| Décisions tracées | pas de quota par tenant sur média (plafond par fichier + dédup + gérant-only) ; REPORT § 4 |
+| Tests | **58/58 PASS** + `make smoke` PASS (après fixes : warm-up batterie MED, date SQL du test LIC calculée en JS) |
+
+Pièges documentés du cycle gate : premier `make test` après redémarrage à froid du conteneur web peut servir un 500 « Unexpected end of JSON input » (artefact HMR `next dev` uniquement) → wrapper `fetchR` (1 ré-essai sur 5xx) dans la batterie TC-MED.

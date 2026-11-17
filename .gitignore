@@ -26,3 +26,4 @@ Thumbs.db
 
 # Clé privée du propriétaire (générée par make license-keygen) — JAMAIS commitée
 infra/keys/owner/
+infra/keys/dev/

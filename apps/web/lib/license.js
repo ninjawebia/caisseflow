@@ -15,12 +15,15 @@
 const crypto = require("crypto");
 const { pool } = require("./db");
 
-// Clé publique DEV (commitée) : ne sert qu'en préprod/démo — toute personne
-// disposant du dépôt peut forger des clés DEV. En production, définir
-// LICENSE_PUBLIC_KEY avec la paire propriétaire (make license-keygen).
+// Clé publique DEV : PAIRE ROTATÉE le 2026-11-17 (l'ancienne, commitée par
+// erreur, est considérée compromise — tout dépôt accessible permettait de
+// forger des clés DEV). La paire DEV est désormais générée par
+// `make license-devkey` (infra/keys/dev/, gitignorée, jamais versionnée) et
+// le serveur de dev charge la clé publique depuis le disque. En production,
+// définir LICENSE_PUBLIC_KEY avec la paire propriétaire (make license-keygen).
 const DEV_PUBLIC_KEY = [
   "-----BEGIN PUBLIC KEY-----",
-  "MCowBQYDK2VwAyEAX6VpmanDqdq4yF1399x6vPBb+8zc897TNPmhlQjkHuw=",
+  "MCowBQYDK2VwAyEAtz2ZAGGHj6koyCqHOa2hV8Lt74T0jBvt4vDRI1iec1k=",
   "-----END PUBLIC KEY-----",
 ].join("\n");
 

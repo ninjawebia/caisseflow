@@ -112,12 +112,15 @@ Voir `workflow/05-handoff.md` §3 pour les alternatives.
 
 ## 9. Résumé sécurité (Phase 4.5 — `security/`)
 
-- **0 vulnérabilité confirmée ouverte.** 7 candidats rejetés avec preuves
-  (`findings.json` : injection SQL, IDOR cross-tenant, CSRF, brute force,
-  révocation, altération fiscale, traversée de chemin).
+- **Ré-audit v0.2→v0.4 (2026-11-17) : gate PASS — 20 règles / 0 FAIL / 0 WARN.**
+- **0 vulnérabilité confirmée ouverte.** 1 confirmé corrigé : SEC-003 (Low 3.5)
+  — paire DEV de licence versionnée → rotation + désuivi git + clé publique
+  chargée du disque (l'ancienne clé de l'historique est inutilisable).
 - **Contrôles positifs démontrés** : append-only en base (UPDATE/DELETE → 0
   ligne), isolation tenant, verrouillage, révocation de session, empreinte
-  d'export vérifiable.
+  d'export vérifiable, validation uploads par magic bytes + UUID serveur
+  (batteries TC-BO1-PHOTO 12/12 et TC-MED 16/16), gate licence sur écritures
+  (TC-LIC 13/13), 3 candidats média rejetés avec preuves (REJ-009/010/011).
 - **2 leads `needs_validation`** (faits de déploiement uniquement) :
   NV-1 — s'assurer que le seed de démonstration ne tourne jamais en prod et
   remplacer le jeton d'appareil de démo ; NV-2 — TLS/HSTS + cookie `Secure` à

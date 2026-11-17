@@ -90,7 +90,9 @@ async function main() {
   check("TC-LIC-011-sync-suspendu", s1.status === 403, `HTTP ${s1.status}`);
 
   // Restauration (expires_at futur) → écritures à nouveau autorisées
-  await pool.query("UPDATE licences SET expires_at = CURRENT_DATE + 365 WHERE restaurant_id = $1", [rid]);
+  // (date calculée en JS : la requête reste 100 % paramétrée)
+  const in365 = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  await pool.query("UPDATE licences SET expires_at = $2 WHERE restaurant_id = $1", [rid, in365]);
   const w3 = await fetch(`${B}/api/articles`, { method: "POST", headers: H(jar), body: JSON.stringify({ nom: `Repris licence ${SFX}`, prix_ttc: 6, taux_tva: 10, actif: true }) });
   const w3b = await w3.json().catch(() => ({}));
   check("TC-LIC-012-reprise-ecriture", w3.status === 201, `HTTP ${w3.status} (article ${w3b.article?.id ? "créé" : "?"})`);

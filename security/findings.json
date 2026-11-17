@@ -142,6 +142,77 @@
       "observed": "l'identifiant doit correspondre à une ligne de la table exports du tenant ; le nom stocké est réduit par basename avant jointure au répertoire",
       "evidence": null,
       "refuted_by": "identifiant UUID obligatoire en base + basename + vérification de préfixe de répertoire"
+    },
+    {
+      "id": "REJ-009",
+      "state": "rejected",
+      "title": "Traversée de chemin via la bibliothèque média (pathOf)",
+      "fingerprint": "media-path-traversal",
+      "severity": null,
+      "trace": [
+        "apps/web/app/api/media/[id]/photo/route.js (pathOf(m.file))",
+        "apps/web/app/api/articles/[id]/photo/route.js (PATCH : photo_file = media.file)",
+        "apps/web/lib/uploads.js (save : nom = crypto.randomUUID() + ext détectée)"
+      ],
+      "principal": "utilisateur authentifié (gérant)",
+      "resource": "lecture/écriture hors du volume uploads",
+      "observed": "aucun chemin ne reçoit d'entrée client : les valeurs `file` en base sont exclusivement produites par save() (UUID serveur) ; PATCH photo ne peut pointer que sur une ligne `media` existante du tenant (WHERE restaurant_id)",
+      "evidence": null,
+      "refuted_by": "aucune écriture du champ `file` depuis la requête client (POST photo + POST media + PATCH media assignation vérifiés ligne à ligne) ; pathOf n'est appelé qu'avec des valeurs de base"
+    },
+    {
+      "id": "REJ-010",
+      "state": "rejected",
+      "title": "Accès cross-tenant à un asset média (IDOR)",
+      "fingerprint": "media-cross-tenant",
+      "severity": null,
+      "trace": [
+        "apps/web/app/api/media/route.js (GET/POST : WHERE restaurant_id = user.restaurantId)",
+        "apps/web/app/api/media/[id]/route.js (DELETE : WHERE id AND restaurant_id)",
+        "apps/web/app/api/media/[id]/photo/route.js (GET : WHERE id AND restaurant_id)"
+      ],
+      "principal": "utilisateur authentifié d'un autre restaurant",
+      "resource": "métadonnées ou fichier d'un média étranger",
+      "observed": "chaque requête scoppée restaurant_id pris de la session (jamais du corps) ; 404 sur identifiant étranger ; compteur nb_articles calculé dans le périmètre du tenant",
+      "evidence": null,
+      "refuted_by": "reproduction bornée : GET d'un média d'un tenant B fictif depuis une session du tenant A → 404 (même schéma de scoping que REJ-002, vérifié sur les 3 routes média)"
+    },
+    {
+      "id": "REJ-011",
+      "state": "rejected",
+      "title": "Contournement de la validation d'upload média (nom/Content-Type client)",
+      "fingerprint": "media-upload-bypass",
+      "severity": null,
+      "trace": [
+        "apps/web/app/api/media/route.js (POST : validate(buffer) sur les octets)",
+        "apps/web/lib/uploads.js (detectImage : signatures JPEG FF-D8-FF / PNG 89504E47 / WebP RIFF…WEBP)"
+      ],
+      "principal": "gérant authentifié",
+      "resource": "stockage d'un fichier non image (payload, HTML/JS, exécutable)",
+      "observed": "PDF renommé .jpg → 400 magic bytes (TC-MED-003) ; le nom de fichier et le Content-Type client sont ignorés (nom UUID serveur, type re-détecté au servage + nosniff)",
+      "evidence": null,
+      "refuted_by": "tests TC-MED-003/006 PASS + lecture du code (aucun accès à file.name ou file.type dans les routes)"
+    },
+    {
+      "id": "SEC-003",
+      "state": "confirmed",
+      "title": "Paire de clés DEV de licence versionnée dans le dépôt (corrigée : rotation + désuivi)",
+      "fingerprint": "dev-license-key-committed",
+      "severity": "Low",
+      "cvss": "AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:L/A:N (3.5) — impact borné aux environnements utilisant la clé DEV (préprod/démo, données fictives) ; la production surcharge la clé via LICENSE_PUBLIC_KEY",
+      "trace": [
+        "git history (commit bbc7b27) : infra/keys/dev/private.pem versionnée",
+        "apps/web/lib/license.js (DEV_PUBLIC_KEY : vérification de la signature de licence)"
+      ],
+      "principal": "toute personne ayant accès au dépôt (littéral public dans l'historique)",
+      "resource": "forge de clés de licence valables pour les environnements vérifiant avec la clé publique DEV",
+      "observed": "réel et démontrable : la clé privée présente dans l'historique signe des clés acceptées par tout serveur utilisant DEV_PUBLIC_KEY",
+      "conditions": "environnements de préprod/démo uniquement ; en production, LICENSE_PUBLIC_KEY pointe sur la paire owner (crypto.verify rejette alors toute signature DEV : « signature refusée »)",
+      "fix": "2026-11-17 — ROTATION de la paire DEV (nouvelle paire Ed25519), désuivi git (git rm --cached + .gitignore infra/keys/dev/), génération idempotente make license-devkey, le serveur de dev charge la clé publique depuis le disque (priorité env > disque > constante). L'ancienne clé privée de l'historique ne signe plus rien d'accepté.",
+      "regression": "TC-LIC 13/13 PASS après rotation (clé valide acceptée, clé altérée/autre restaurant/expirée refusées) + security-audit.sh rule secrets-committed PASS",
+      "evidence": "git log avant/après + batterie TC-LIC",
+      "blocker": null,
+      "check": "git -C projects/CaisseFlow ls-files -- '*.pem' → vide ; TC-LIC-002 (signature altérée → 400) PASS sur la nouvelle paire"
     }
   ],
   "hardening": [

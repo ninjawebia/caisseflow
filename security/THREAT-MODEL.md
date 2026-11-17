@@ -17,6 +17,8 @@ données réelles (règles d'engagement du workflow/06 §1).
 | PIN et mots de passe (`users_mobile.pin_hash`, `users_web.hashedPassword`) | Personnels/secret | bcrypt cost 10 |
 | Piste d'audit (`audit_log`) | Élevée — preuve d'actions (repudiation) | PostgreSQL (append-only) |
 | État de licence (`licences`) | Moyenne — pilote la dégradation de service | PostgreSQL |
+| Bibliothèque média (`media` + fichiers `uploads/`) | Interne — images de la carte, par restaurant, dédupliquées par hash | PostgreSQL (métadonnées) + volume Docker `web_uploads` (fichiers UUID) |
+| Paire de clés de licence | Élevée — la clé privée **owner** signe les licences ; la paire DEV (préprod) est générée hors dépôt (`make license-devkey`, gitignorée) et ROTÉE le 2026-11-17 (l'ancienne, un temps versionnée, est réputée compromise) | `infra/keys/` (hors git) + clé publique DEV en constante de secours |
 | Disponibilité du service | Moyenne — VPS Dokploy en production | hors périmètre des tests |
 
 ## 2. Acteurs
@@ -57,6 +59,8 @@ données réelles (règles d'engagement du workflow/06 §1).
 | Tablette→API | spoof de poste (token aléatoire hashé) | réécriture du journal (chaînage SHA-256 vérifié à l'insert, idempotence UUID) | ref/uuid + horloge journalisées | pull ne renvoie que le tenant du token | lot borné, transactionnel | un poste ne pousse que son propre journal |
 | API→DB | — | injection SQL (100 % paramétré, pas de concat de valeurs) | — | isolation tenant par `restaurant_id` dans chaque requête | pas de UPDATE/DELETE possible sur les 3 tables fiscales (règles SQL) | rôles applicatifs limités aux droits de la connexion |
 | Admin→tenant | compte admin dédié | état de licence audité | audit | admin sans accès aux données fiscales | — | permission `licence` distincte |
+| Upload média (navigateur→API) | vol de session (cookie HttpOnly) | contenu validé par MAGIC BYTES (jamais le nom/Content-Type client), ≤ 2 Mo, ≤ 2048 px, nom UUID généré serveur | audit `media_upload` / `media_delete` / `photo_set` | `Content-Type` détecté serveur + `nosniff` ; dossier privé derrière la session | plafond taille/dimensions par fichier ; dédup par hash (pas de duplication abusive) | RBAC : lecture tout le personnel, écriture gérant + gate licence ; suppression d'asset utilisée refusée |
+| Clé de licence (gérant→API) | activation gérant only | signature Ed25519 vérifiée EN LOCAL contre la clé publique du logiciel | audit `licence_activate` | clé publique surchargeable par `LICENSE_PUBLIC_KEY` (prod) | — | clé = `CF-<payload>.<sig>` liée au restaurant (rid), expiration en payload |
 
 ## 6. Contrôles revendiqués (et où ils vivent)
 
@@ -75,6 +79,10 @@ données réelles (règles d'engagement du workflow/06 §1).
 | Hachage mots de passe / PIN bcrypt cost 10 | `app/api/users-mobile`, seed, login |
 | Chemin de fichiers borné (exports) | `app/app/api/exports/[id]/route.js` (basename + préfixe de répertoire) |
 | Dégradation de licence sans blocage fiscal | `lib/device.js syncAllowed()`, `/api/licence/status` |
+| Validation uploads (magic bytes, ≤ 2 Mo, ≤ 2048 px, nom UUID serveur) | `lib/uploads.js` (`validate`, `save`), appliquée photos d'articles ET bibliothèque média |
+| Bibliothèque média : dédup par hash, suppression refusée si utilisée | `app/api/media/*`, garde-fou applicatif (400 + nb_articles) |
+| Gate licence sur les écritures (8 endpoints + sync pull) | `lib/license.js licenceGate()` |
+| Clé de licence : paire owner hors dépôt, paire DEV gitignorée + ROTÉE (2026-11-17) | `Makefile license-keygen` / `license-devkey`, `lib/license.js publicKeyPem()` (priorité env > disque > constante) |
 
 ## 7. Limites de couverture déclarées
 

@@ -120,6 +120,19 @@ license-keygen:
 	@echo "Paire propriétaire créée : infra/keys/owner/{private,public}.pem"
 	@echo "→ En production, montez LICENSE_PUBLIC_KEY=infra/keys/owner/public.pem dans l'environnement du conteneur web."
 
+# Paire DEV (préprod/tests uniquement) — idempotente, JAMAIS versionnée
+# (gitignorée). Le serveur de dev charge la clé publique depuis le disque
+# (Dockerfile stage dev) ; les batteries signent avec la clé privée.
+license-devkey:
+	@test -f infra/keys/dev/private.pem || docker run --rm -v "$$PWD":/repo -w /repo --user root node:22-alpine sh -c "\
+	  node -e \"const{generateKeyPairSync}=require('crypto');const fs=require('fs');\
+	  const{publicKey,privateKey}=generateKeyPairSync('ed25519');\
+	  fs.mkdirSync('infra/keys/dev',{recursive:true});\
+	  fs.writeFileSync('infra/keys/dev/public.pem',publicKey.export({type:'spki',format:'pem'}));\
+	  fs.writeFileSync('infra/keys/dev/private.pem',privateKey.export({type:'pkcs8',format:'pem'}));\" \
+	  && chown -R `id -u`:`id -g` infra/keys/dev && chmod 600 infra/keys/dev/private.pem && chmod 644 infra/keys/dev/public.pem"
+	@echo "Paire DEV prête : infra/keys/dev/{private,public}.pem (gitignorée)"
+
 # Génère une clé de licence pour un client (RID = UUID du restaurant).
 license-gen:
 	@test -n "$(RID)" || { echo "Usage: make license-gen RID=<UUID restaurant> EXP=AAAA-MM-JJ PLAN=pro"; exit 1; }
@@ -131,7 +144,7 @@ seed:
 	$(COMPOSE) exec web sh -c "cd /repo/apps/web && node db/seed.js"
 
 # Tests : chaînage NF525 + healthcheck, tout dans les conteneurs.
-test:
+test: license-devkey
 	$(COMPOSE) exec web sh -c "cd /repo/apps/web && npm test"
 
 chain-check:

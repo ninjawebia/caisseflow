@@ -27,7 +27,11 @@ EXPOSE 3000
 # Si l'installation échoue, on ABORT (jamais un next dégradé via npx).
 # Les volumes (.next, uploads) sont chownés 1000:1000 à chaque démarrage —
 # l'app tourne ensuite en node (UID 1000), jamais en root.
-CMD ["sh", "-c", "mkdir -p /repo/apps/web/.next /repo/apps/web/uploads /repo/node_modules && chown -R 1000:1000 /repo/apps/web/.next /repo/apps/web/uploads /repo/node_modules && su-exec node sh -c 'ls /repo/node_modules/.package-lock.json >/dev/null 2>&1 || npm ci --no-audit --no-fund || exit 1; cd apps/web && npx next dev -H 0.0.0.0 -p 3000'"]
+# Clé publique de licence : priorité 1) LICENSE_PUBLIC_KEY env (prod, paire
+# owner), 2) /repo/infra/keys/dev/public.pem monté (dev/préprod — paire DEV
+# générée par `make license-devkey`, jamais versionnée), 3) la constante
+# DEV_PUBLIC_KEY de lib/license.js (dernier recours).
+CMD ["sh", "-c", "mkdir -p /repo/apps/web/.next /repo/apps/web/uploads /repo/node_modules && chown -R 1000:1000 /repo/apps/web/.next /repo/apps/web/uploads /repo/node_modules && su-exec node sh -c 'ls /repo/node_modules/.package-lock.json >/dev/null 2>&1 || npm ci --no-audit --no-fund || exit 1; if [ -z \"$LICENSE_PUBLIC_KEY\" ] && [ -f /repo/infra/keys/dev/public.pem ]; then export LICENSE_PUBLIC_KEY=$(cat /repo/infra/keys/dev/public.pem); fi; cd apps/web && npx next dev -H 0.0.0.0 -p 3000'"]
 
 # --- Stage build : compilation production (sortie standalone) ---
 FROM node:22-alpine AS build
