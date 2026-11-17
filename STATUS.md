@@ -86,3 +86,14 @@ Correctifs pendant le cycle F2 (pièges documentés) : `params` Promise Next 15 
 | Activation de licence | migration 0007 (expires_at/plan/cle_id) ; lib/license (Ed25519, verifyKey/signLicense/licenceGate) ; POST /api/licence/activate (gérant) ; gate écritures 403 (articles/catégories/photos) + sync pull suspendu ; lecture/exports OK (LIC-4) ; UI page Licence ; `make license-keygen` / `make license-gen` (clé privée owner gitignorée, paire DEV commitée pour préprod uniquement) | TC-LIC 13/13 → **TOTAL 42/42** + smoke PASS | `bbc7b27` (poussé) |
 
 Docs mises à jour dans la même passe : TEST-PLAN § 22 (13 cas PASS), README (Sécurité + arborescence), HANDOFF (§ 8 tests, § 10 limites : paire DEV).
+
+## Améliorations v0.4 (2026-11-17)
+
+| Module | Contenu | Tests | Commit |
+| --- | --- | --- | --- |
+| Bibliothèque média | migration `0008_media.sql` (table `media`, dédup UNIQUE(restaurant_id, hash), backfill photos F2) ; `/api/media` GET (tout le personnel, `nb_articles`) / POST (gérant + gate licence, dedup → `200 {dedup:true}`) ; `/api/media/[id]/photo` GET (ETag/304) ; `/api/media/[id]` DELETE (refus 400 si utilisé, sinon archive 30 j) ; `/api/articles/[id]/photo` POST (dédup, plus d'archivage au remplacement) + PATCH `{media_id}` (assignation bibliothèque) + DELETE (déliaison simple, asset conservé) ; `components/MediaPicker.js` (modale grille, badges « ×n »/« Active », recherche, upload depuis la modale, Échap/fond) ; zone photo 2 modes (« Téléverser une image » + « Choisir dans la bibliothèque ») | TC-MED **16/16 PASS** → TOTAL **58/58** + smoke PASS | `62a4734` (poussé) |
+| Aperçu du ticket 58 mm | `components/TicketPreview.js` (ticket papier ~224 px, monospace, séparateurs pointillés, mentions NF525 en données d'exemple, bandeau « aperçu approchant ») ; intégré sous le formulaire `/ticket-modele`, mise à jour en direct pendant la saisie (logo + mentions) ; restaurant (nom/SIRET/adresse) passé par la page | TC-TKT **3/3 PASS** (inclus dans les 58) | `62a4734` (poussé) |
+
+Docs mises à jour dans la même passe : TEST-PLAN § 23 (TC-MED) / § 24 (TC-TKT), PRD ch. 14.3/14.4 [IMPLÉMENTÉ v0.4], DESIGN-BLUEPRINT § 9.3/9.4, HANDOFF § 8 (modules 16/17).
+
+Pièges documentés du cycle : contenus PNG des fixtures désormais **uniques par run** (`pngUnique` = PNG + sha256 du salt, sinon la dédup réutilisait l'asset d'un run précédent référencé par un article résiduel → MED-010 400) ; batteries CAT/PHOTO/MED suppriment leurs articles de test en fin de passage (rerun-safe) ; imports `licenceGate` à profondeur 3/4/5 selon la route ; doublon `export DELETE` créé par substitution partielle (balance accolades 0 vérifiée).

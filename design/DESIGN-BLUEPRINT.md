@@ -222,3 +222,15 @@ A detailed UI/UX design specification. No reference images were supplied (PRD A9
 - **Dans la grille du menu / sync tablette** : vignette 512 px générée (coin arrondi 8 px, aspect-ratio 1:1, fallback = initiale de l'article sur fond slate-100).
 - **États obligatoires** : sans photo (fallback initiale), en cours d'upload (barre + désactivation des boutons), format/taille refusés (message inline rouge sous la zone : « JPEG, PNG ou WebP — 2 Mo max »), erreur serveur (toast rouge + image conservée).
 - **Règles dictionnaire** : contrastes 4.5:1, pas d'information portée par la couleur seule (l'état « sans photo » porte une initiale lisible).
+
+### 9.3 Bibliothèque média (v0.4 — gérant en écriture, tout le personnel en lecture)
+- **Zone photo de l'éditeur d'article** (`/menu`) : deux modes côte à côte — bouton « Téléverser une image » (input fichier, label dynamique « Téléverser » sur un article déjà photo) + bouton secondaire bleu « Choisir dans la bibliothèque » ; rappel des contraintes sous la zone (« JPEG, PNG ou WebP — 2 Mo max, 2048 px max »).
+- **Modale `MediaPicker`** (pattern WordPress/media picker mobile) : overlay slate-900/50, panneau blanc 2xl 640 px max ; en-tête (titre + sous-titre + croix 36 px), barre d'outils (recherche par empreinte + bouton « Téléverser une nouvelle image »), grille 3–4 colonnes de vignettes carrées ; badge « Active » (bleu-600) sur la vignette courante, badge d'usage « ×n » (fond slate-900/70) en bas à droite ; bordure + anneau bleu sur la sélection.
+- **États obligatoires** : chargement (8 skeleton pulsés), vide (« Bibliothèque vide — téléversez votre première image »), aucun résultat de recherche, erreur (bannière rose), busy (boutons désactivés opacity-50) ; dedup silencieux (l'asset existant est réutilisé, sélection immédiate).
+- **Accessibilité** : `role="dialog"` `aria-modal`, fermeture Échap et clic sur le fond, cibles ≥ 32 px, focus visible (ring bleu-600).
+
+### 9.4 Aperçu du ticket 58 mm (v0.4)
+- **Emplacement** : 3ᵉ bloc de la page `/ticket-modele`, sous le formulaire (séparé par un filet slate-100), titre « Aperçu du ticket » + sous-titre « Papier 58 mm — mis à jour en direct pendant la saisie ».
+- **Rendu** : ticket ~224 px (`w-56`) centré, fond blanc, police monospace 11 px, séparateurs pointillés slate-400, ombre portée légère ; en-tête logo (saisi, en majuscules) + raison sociale/adresse/SIRET du restaurant ; lignes d'exemple, RÉCAP TVA, TOTAL TTC en gras, paiement, empreinte ; mentions libres du modèle en italique centré.
+- **États/comportement** : mise à jour en direct (live pendant la frappe, aucune soumission nécessaire) ; mentions NF525 en données d'exemple figées ; bandeau discret « ~ Aperçu approchant — rendu réel à l'impression (ESC/POS) ~ » (9 px, slate-500) pour éviter toute confusion avec le ticket imprimé.
+- **Règles dictionnaire** : `data-testid="ticket-preview"` pour les tests, pas d'information portée par la couleur seule, texte sélectionnable désactivé (`select-none`).

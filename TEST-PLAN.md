@@ -498,3 +498,45 @@ Chaque cas porte : **ID**, **titre**, **module**, **exigence PRD liée**, **prio
 | TC-LIC-013 | Après activation | audit_log | traces `licence_activate` | PASS |
 
 **Exécution du 2026-11-17** (dans le conteneur, `make test`) : **TC-LIC 13/13 PASS** — total général **42/42 PASS** (chain-check + TC-BO1-CAT 13 + TC-BO1-PHOTO 12 + TC-UI-MENU 4 + TC-LIC 13), `make smoke` PASS.
+
+## 23. Bibliothèque média — TC-MED (v0.4, PRD ch. 14.3, implémenté le 2026-11-17)
+
+> Assets d'images réutilisables par restaurant : déduplication par hash SHA-256
+> (un contenu = 1 asset), les articles référencent le contenu (photo_file/
+> photo_hash dénormalisés — pas de FK), retirer la photo d'un article ne
+> supprime jamais l'asset, suppression d'un asset utilisé refusée. Droits :
+> lecture tout le personnel, écriture/suppression gérant + gate licence.
+> Tests rerun-safe (contenus PNG uniques par run, nettoyage des articles de test).
+
+| ID | Précondition | Action | Attendu | Statut |
+| --- | --- | --- | --- | --- |
+| TC-MED-001 | Gérant | POST /api/media PNG valide | `201` {media: id, hash} ; asset en base + fichier UUID sur disque | PASS |
+| TC-MED-002 | Gérant | Même contenu re-téléversé | `200` {dedup:true, media.id identique} — 0 nouvelle ligne, 0 nouveau fichier | PASS |
+| TC-MED-003 | Gérant | PDF renommé .jpg | `400` magic bytes refusés | PASS |
+| TC-MED-004 | Comptable | POST /api/media | `403` — écriture réservée au gérant | PASS |
+| TC-MED-005 | Gérant | GET /api/media | `200` ; chaque asset porte `nb_articles` (badge « ×n ») | PASS |
+| TC-MED-006 | Gérant | GET /api/media/[id]/photo + If-None-Match | `200 image/png` puis `304` (ETag = hash) | PASS |
+| TC-MED-007 | Gérant | PATCH /api/articles/[id]/photo {media_id} | `200` ; article pointe sur l'asset (aucune écriture disque) + photo servie | PASS |
+| TC-MED-008 | Gérant | DELETE photo de l'article (déliaison) | `200` ; asset CONSERVÉ en bibliothèque, fichier intact | PASS |
+| TC-MED-009 | Gérant | DELETE /api/media/[id] d'un asset UTILISÉ | `400` {nb_articles ≥ 1} | PASS |
+| TC-MED-010 | Gérant | DELETE d'un asset LIBRE | `200` ; ligne supprimée, fichier archivé (30 j) | PASS |
+| TC-MED-011 | Gérant | PATCH avec media_id inconnu | `404` « introuvable dans la bibliothèque » | PASS |
+| TC-MED-012 | Après passage | audit_log | traces `media_upload` / `media_delete` | PASS |
+
+**Exécution du 2026-11-17** (dans le conteneur, `make test`) : **TC-MED 16/16 PASS** (12 cas + 007b-photo-serve + 012-audit) — total général **58/58 PASS** (29 backlog + 13 LIC + 16 MED/TKT), `make smoke` PASS, chaînage intact (FISC-2 ✓).
+
+## 24. Aperçu du ticket — TC-TKT (v0.4, PRD ch. 14.4, implémenté le 2026-11-17)
+
+> Rendu approchant d'un ticket papier 58 mm (police monospace, séparateurs
+> pointillés) intégré à la page `/ticket-modele`, mis à jour en direct pendant
+> la saisie du logo et des mentions. Les mentions légales NF525 (SIRET, récap
+> TVA, TOTAL, empreinte) sont des données d'EXEMPLE — l'aperçu ne remplace pas
+> le rendu imprimé ESC/POS.
+
+| ID | Précondition | Action | Attendu | Statut |
+| --- | --- | --- | --- | --- |
+| TC-TKT-001 | Gérant | GET /ticket-modele (SSR) | `200` ; composant `ticket-preview` présent avec titre « Aperçu du ticket » | PASS |
+| TC-TKT-002 | Gérant | Contenu de l'aperçu | mentions NF525 d'exemple : « RÉCAP TVA », « TOTAL TTC », « Empreinte » | PASS |
+| TC-TKT-003 | Gérant | PATCH modèle puis rechargement | `200` ; l'aperçu reflète le logo et les mentions enregistrés | PASS |
+
+**Exécution du 2026-11-17** (dans le conteneur, `make test`) : **TC-TKT 3/3 PASS** — total avec TC-MED **16/16 PASS**.

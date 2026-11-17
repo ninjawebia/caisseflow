@@ -107,6 +107,8 @@ Voir `workflow/05-handoff.md` §3 pour les alternatives.
 | 13 | Backlog F2 — photos | `02d1c56` | TC-BO1-PHOTO **12/12 PASS** (magic bytes, 2 Mo/2048 px, UUID serveur, ETag 304, archivage 30 j, device Bearer 200) |
 | 14 | UI menu v0.3 | `95c7876` | TC-UI-MENU **4/4 PASS** (photo dès création, recherche, tri, TTC temps réel) |
 | 15 | Licence par clé signée | `bbc7b27` | TC-LIC **13/13 PASS** (activation, signatures refusées, gate écritures 403, sync suspendu, lecture OK) — TOTAL **42/42 PASS** |
+| 16 | Bibliothèque média | `62a4734` | TC-MED **16/16 PASS** (dédup hash, réutilisation PATCH, déliaison = asset conservé, delete refusé si utilisé, 403 comptable, ETag/304) — TOTAL **58/58 PASS** |
+| 17 | Aperçu ticket 58 mm | `62a4734` | TC-TKT **3/3 PASS** (composant présent en SSR, mentions NF525 d'exemple, reflet du modèle enregistré) |
 
 ## 9. Résumé sécurité (Phase 4.5 — `security/`)
 

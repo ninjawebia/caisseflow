@@ -1025,6 +1025,22 @@ Ajouter, remplacer et supprimer une photo par article, avec stockage persistant 
 - **iPad / multi-plateformes:** selon demande du parc (année 2).
 - **Exports PDF périodiques automatiques:** envoi mensuel automatique à l'expert-comptable.
 
+### 14.3 [IMPLÉMENTÉ v0.4] Bibliothèque média (réutilisation des images)
+
+- **Besoin** : réutiliser une image déjà téléversée sans la recharger — le champ photo de l'article propose deux modes : « Téléverser une image » (nouveau fichier) et « Choisir dans la bibliothèque » (modale type WordPress/media picker : grille de vignettes, badge d'usage « ×n », badge « Active » sur la vignette courante, recherche, téléversement possible depuis la modale, fermeture Échap/clic extérieur).
+- **Modèle** : table `media` par restaurant (migration `0008_media.sql`, backfill des photos F2 existantes) ; **déduplication par hash SHA-256** — un même contenu n'est stocké qu'une fois (upload en double → `200 {dedup:true}`, aucun nouveau fichier). Les articles référencent le **contenu** (`photo_file`/`photo_hash` dénormalisés, pas de FK) : le cycle de vie de l'asset est indépendant de l'article.
+- **Cycle de vie** : retirer la photo d'un article = simple **déliaison** (l'asset reste réutilisable) ; supprimer un asset utilisé par un article est **refusé** (`400 {nb_articles}`) ; un asset libre est archivé 30 j (même rétention que les photos).
+- **Droits** : lecture tout le personnel connecté du restaurant ; téléversement/assignation/suppression gérant + gate licence (LIC-4 : lecture jamais verrouillée).
+- **Compatibilité** : aucun impact tablette — les photos continuent d'être servies via `/api/articles/[id]/photo` (ETag SHA-256 + 304 inchangés) ; aucun impact offline.
+- **Tests** : TC-MED 16/16 PASS (TEST-PLAN § 23).
+
+### 14.4 [IMPLÉMENTÉ v0.4] Aperçu du ticket (WYSIWYG 58 mm)
+
+- **Besoin** : voir le rendu approchant du ticket pendant l'édition du modèle — standard WYSIWYG de tout éditeur de modèle d'impression.
+- **Réalisation** : composant `TicketPreview` intégré sous le formulaire de `/ticket-modele` — ticket papier 58 mm (~224 px, police monospace, séparateurs pointillés, style imprimante thermique ESC/POS) mis à jour **en direct** pendant la saisie du logo et des mentions.
+- **Mentions légales NF525** : rendues en **données d'exemple figées** (SIRET, récap TVA par taux, TOTAL TTC, empreinte, clôture Z signée) — elles sont imprimées par la caisse, jamais configurables ; l'aperçu ne remplace pas le rendu réel à l'impression (bandeau explicite).
+- **Tests** : TC-TKT 3/3 PASS (TEST-PLAN § 24).
+
 ## 15. Explicitly Rejected Features (Scope Guardrails)
 
 - **Modification ou suppression d'écritures fiscales:** rejetée par conception — viole l'inaltérabilité NF525 ; toute correction est une nouvelle écriture.
