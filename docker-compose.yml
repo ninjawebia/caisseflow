@@ -42,7 +42,12 @@ services:
       - ./packages/shared:/repo/packages/shared
       - ./infra/scripts:/repo/infra/scripts:ro
       - web_node_modules:/repo/node_modules
+      # Caches de build : volume nommé (performance, pas d'accès hôte requis).
       - web_next_cache:/repo/apps/web/.next
+      # Fichiers générés à récupérer/éditer sur l'hôte (UID 1000) :
+      - ./output/exports:/repo/output/exports
+      - ./output/reports:/repo/output/reports
+      - ./logs:/repo/apps/web/logs
     depends_on:
       postgres:
         condition: service_healthy
@@ -82,8 +87,12 @@ services:
       context: .
       dockerfile: apps/mobile/Dockerfile
     volumes:
-      - mobile_outputs:/outputs
-    profiles: [apk]   # ne démarre pas avec make up ; lancé par make build-apk
+      # L'APK atterrit DIRECTEMENT sur l'hôte (output/apk, propriétaire UID 1000).
+      - ./output/apk:/outputs
+      # Cache Gradle en volume nommé (jamais sur l'hôte — plusieurs Go, aucun
+      # besoin d'y accéder ; accélère fortement les builds suivants).
+      - gradle_cache:/root/.gradle
+    profiles: [apk]   # ne démarre pas avec make up ; lancé par make build-apk / up-all
     networks: [caisseflow-net]
 
 networks:
@@ -94,4 +103,4 @@ volumes:
   caisseflow_pgdata:
   web_node_modules:
   web_next_cache:
-  mobile_outputs:
+  gradle_cache:

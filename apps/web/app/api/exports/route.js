@@ -6,7 +6,9 @@ import { sha256hex } from "../../../lib/fiscal";
 import fs from "fs";
 import path from "path";
 
-const EXPORT_DIR = path.join(process.cwd(), "var", "exports");
+// Exports fiscaux écrits sur l'hôte (bind-mount ./output/exports, UID 1000),
+// surchargeable par EXPORT_DIR (prod : volume dédié). cwd = /repo/apps/web.
+const EXPORT_DIR = process.env.EXPORT_DIR || path.resolve(process.cwd(), "..", "..", "output", "exports");
 
 function csvEscape(v) {
   const s = v === null || v === undefined ? "" : String(v);

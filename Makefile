@@ -7,8 +7,8 @@ COMPOSE   := docker compose
 COMPOSE_P := docker compose -f docker-compose.prod.yml
 
 .DEFAULT_GOAL := help
-.PHONY: help up down restart ps logs stop-web clean build shell-web migrate seed test \
-        chain-check healthcheck smoke reset backup restore build-apk info push
+.PHONY: help up up-all down restart ps logs stop-web clean build shell-web migrate seed test \
+        chain-check healthcheck smoke reset backup restore build-apk fix-perms info push
 
 help:
 	@echo "CaisseFlow — commandes (100 % Docker, aucune installation Node requise)"
@@ -28,7 +28,8 @@ help:
 	@echo "  make backup      pg_dump horodaté + gzip + rotation (14 derniers)"
 	@echo "  make restore FILE=caisseflow-YYYYMMDD-HHMMSS.sql.gz"
 	@echo "  make up-all      Comme up + conteneur mobile (lance un build APK — long au 1er run)"
-	@echo "  make build-apk   Build APK Android dans le conteneur mobile (→ apps/mobile/outputs)"
+	@echo "  make build-apk   Build APK Android dans le conteneur mobile (→ output/apk)"
+	@echo "  make fix-perms   Réparer les droits hôte 1000:1000 sans sudo (conteneur jetable)"
 	@echo "  make build       Reconstruire les images (après modification du Dockerfile)"
 	@echo "  make clean       Supprimer aussi les volumes (node_modules, caches)"
 	@echo "  make info        Informations (URL, pages, comptes démo, matricules)"
@@ -36,14 +37,16 @@ help:
 
 # Démarrage de TOUS les conteneurs persistants : web + postgres + adminer + mailhog.
 up:
+	@mkdir -p output/apk output/reports output/exports logs
 	$(COMPOSE) up -d web postgres adminer mailhog
 	@echo "→ web : http://localhost:3000 · adminer : http://localhost:8081 · mailhog : http://localhost:8025"
 
 # Tout, y compris le conteneur mobile (lance un build APK au démarrage —
 # premier run long : téléchargement Android SDK ~3 Go, 10–20 min).
 up-all:
-	$(COMPOSE) --profile apk up -d
-	@echo "→ y compris le conteneur mobile (build APK → apps/mobile/outputs)"
+	@mkdir -p output/apk output/reports output/exports logs
+	$(COMPOSE) --profile apk up -d --build
+	@echo "→ y compris le conteneur mobile (build APK → output/apk)"
 
 down:
 	$(COMPOSE) down
@@ -119,7 +122,11 @@ restore:
 # Build APK Android (service mobile, profile "apk" — jamais démarré avec make up).
 build-apk:
 	$(COMPOSE) run --rm mobile ./scripts/build-apk.sh
-	@echo "APK copié dans apps/mobile/outputs/ (volume mobile_outputs)."
+	@echo "APK copié dans output/apk/ (propriétaire UID 1000)."
+
+# Répare les droits hôte (UID 1000) sans sudo — via un conteneur jetable alpine.
+fix-perms:
+	bash infra/scripts/fix-permissions.sh
 
 info:
 	@echo "================ CaisseFlow — POS restaurant conforme NF525 ================"

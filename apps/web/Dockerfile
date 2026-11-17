@@ -20,7 +20,7 @@ COPY . .
 # Points de montage des volumes nommés : pré-créés et possédés par node (UID 1000),
 # sinon Docker les crée root-owned → EACCES sur .next/trace.
 RUN mkdir -p /repo/apps/web/.next && chown -R node:node /repo/apps/web/.next /repo/node_modules
-USER node
+USER 1000:1000
 EXPOSE 3000
 # node_modules vit dans un volume nommé : installé DANS le conteneur si absent
 # (machine vierge ou après make clean), puis hot-reload sur le code monté.
@@ -48,7 +48,7 @@ ENV HOSTNAME=0.0.0.0
 # Sortie standalone Next.js : server.js + traced files (inclut @caisseflow/shared)
 COPY --from=build --chown=node:node /repo/apps/web/.next/standalone ./
 COPY --from=build --chown=node:node /repo/apps/web/.next/static ./apps/web/.next/static
-USER node
+USER 1000:1000
 EXPOSE 3000
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
   CMD wget -qO- http://127.0.0.1:3000/api/health || exit 1

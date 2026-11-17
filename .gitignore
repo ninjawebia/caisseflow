@@ -1,11 +1,25 @@
+# Secrets — jamais commités
 .env
 .env.*
 !.env.example
 .dev.vars
+
+# Dépendances et caches de build (recréés DANS les conteneurs)
 node_modules/
+apps/*/node_modules/
+packages/*/node_modules/
+apps/web/.next/
 dist/
 build/
 .dart_tool/
 .wrangler/
+
+# Fichiers générés — récupérables sur l'hôte, jamais versionnés
+output/
+logs/
+infra/backups/*
+!infra/backups/.gitkeep
+
+# OS
 .DS_Store
 Thumbs.db
