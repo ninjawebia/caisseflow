@@ -109,3 +109,13 @@ Pièges documentés du cycle : contenus PNG des fixtures désormais **uniques pa
 | Tests | **58/58 PASS** + `make smoke` PASS (après fixes : warm-up batterie MED, date SQL du test LIC calculée en JS) |
 
 Pièges documentés du cycle gate : premier `make test` après redémarrage à froid du conteneur web peut servir un 500 « Unexpected end of JSON input » (artefact HMR `next dev` uniquement) → wrapper `fetchR` (1 ré-essai sur 5xx) dans la batterie TC-MED.
+
+## Build APK v0.4.0 (2026-11-17)
+
+| Élément | Résultat |
+| --- | --- |
+| APK | `output/apk/caisseflow-0.4.0-release.apk` — `fr.caisseflow.app` **versionName 0.4.0, versionCode 2**, minSdk 24 (vérifié `aapt2 dump badging`) |
+| Build | BUILD SUCCESSFUL 4 m 25 s (Gradle assembleRelease dans le conteneur mobile, `make build-apk`) |
+| Infrastructure | nouveau volume nommé `android_sdk` (NDK r26b ~2,5 Go installé UNE fois, plus de re-téléchargement à chaque build) ; build-tools 34.0.0 ajouté au SDK (demandé par le template RN 0.76.9) ; image mobile rebuildée (app.json 0.4.0 + package.json 0.4.0 sont COPIÉS dans l'image — pas de montage source) |
+| Pièges documentés | le nom d'APK vient de `apps/mobile/package.json` (bumpé 0.1.0 → 0.4.0 en même temps que app.json) ; l'ancienne 1ʳᵉ erreur du build (« Could not get unknown property 'release' ») est COLLATÉRALE à l'échec d'installation du NDK ; `sdkmanager ndk;26.1.10909125` manuel ≈ 15-25 min (lent mais fiable) | 
+| Commit | `4835d7a` (poussé) |
