@@ -12,7 +12,7 @@ COMPOSE_P := docker compose -f docker-compose.prod.yml
 
 help:
 	@echo "CaisseFlow — commandes (100 % Docker, aucune installation Node requise)"
-	@echo "  make up          Démarrer le dev (web+postgres+adminer+mailhog)   [= docker compose up -d]"
+	@echo "  make up          Démarrer TOUS les conteneurs (web+postgres+adminer+mailhog)"
 	@echo "  make down        Arrêter et retirer les conteneurs (données conservées)"
 	@echo "  make restart     Redémarrer les services dev"
 	@echo "  make ps          État des conteneurs"
@@ -27,15 +27,23 @@ help:
 	@echo "  make reset       Base de démo NEUVE (volume supprimé !) + migrate + seed"
 	@echo "  make backup      pg_dump horodaté + gzip + rotation (14 derniers)"
 	@echo "  make restore FILE=caisseflow-YYYYMMDD-HHMMSS.sql.gz"
+	@echo "  make up-all      Comme up + conteneur mobile (lance un build APK — long au 1er run)"
 	@echo "  make build-apk   Build APK Android dans le conteneur mobile (→ apps/mobile/outputs)"
 	@echo "  make build       Reconstruire les images (après modification du Dockerfile)"
 	@echo "  make clean       Supprimer aussi les volumes (node_modules, caches)"
 	@echo "  make info        Informations (URL, pages, comptes démo, matricules)"
 	@echo "  make push        Pousser vers GitHub (origin main)"
 
+# Démarrage de TOUS les conteneurs persistants : web + postgres + adminer + mailhog.
 up:
-	$(COMPOSE) up -d
+	$(COMPOSE) up -d web postgres adminer mailhog
 	@echo "→ web : http://localhost:3000 · adminer : http://localhost:8081 · mailhog : http://localhost:8025"
+
+# Tout, y compris le conteneur mobile (lance un build APK au démarrage —
+# premier run long : téléchargement Android SDK ~3 Go, 10–20 min).
+up-all:
+	$(COMPOSE) --profile apk up -d
+	@echo "→ y compris le conteneur mobile (build APK → apps/mobile/outputs)"
 
 down:
 	$(COMPOSE) down
@@ -54,10 +62,13 @@ stop-web:
 	$(COMPOSE) rm -f web
 	@echo "Serveur web dev arrêté (cache .next dans son volume — purge par make clean)."
 
-# Purge des caches de build (web_next_cache = .next du conteneur).
+# Purge des caches de build (web_next_cache = .next du conteneur) et des
+# dépendances (apps/web/node_modules = monté dans le conteneur, réinstallé
+# au prochain make up par le npm ci du conteneur).
 clean:
 	$(COMPOSE) down
 	$(COMPOSE) volume rm caisseflow_web_next_cache caisseflow_web_node_modules 2>/dev/null || true
+	rm -rf apps/web/node_modules
 	@echo "Caches purgés — recréés au prochain make up (npm ci dans le conteneur)."
 
 build:

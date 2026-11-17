@@ -24,7 +24,8 @@ USER node
 EXPOSE 3000
 # node_modules vit dans un volume nommé : installé DANS le conteneur si absent
 # (machine vierge ou après make clean), puis hot-reload sur le code monté.
-CMD ["sh", "-c", "ls /repo/node_modules/.package-lock.json >/dev/null 2>&1 || npm ci --no-audit --no-fund; cd apps/web && npx next dev -H 0.0.0.0 -p 3000"]
+# Si l'installation échoue, on ABORT (jamais un next dégradé via npx).
+CMD ["sh", "-c", "ls /repo/node_modules/.package-lock.json >/dev/null 2>&1 || npm ci --no-audit --no-fund || exit 1; cd apps/web && npx next dev -H 0.0.0.0 -p 3000"]
 
 # --- Stage build : compilation production (sortie standalone) ---
 FROM node:22-alpine AS build
