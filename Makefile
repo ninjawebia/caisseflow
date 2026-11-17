@@ -7,7 +7,8 @@ COMPOSE   := docker compose
 COMPOSE_P := docker compose -f docker-compose.prod.yml
 
 .DEFAULT_GOAL := help
-.PHONY: help up up-all down restart ps logs stop-web clean build shell-web migrate seed test \
+.PHONY: help up up-all down restart ps logs stop-web clean build shell-web shell-postgres \
+        shell-adminer shell-mailhog shell-mobile migrate seed test \
         chain-check healthcheck smoke reset backup restore build-apk fix-perms info push
 
 help:
@@ -18,6 +19,10 @@ help:
 	@echo "  make ps          État des conteneurs"
 	@echo "  make logs        Journaux en direct (web + postgres)"
 	@echo "  make shell-web   Shell dans le conteneur web (npm OK — dans le conteneur)"
+	@echo "  make shell-postgres  psql direct (conteneur postgres)"
+	@echo "  make shell-adminer   Shell conteneur adminer"
+	@echo "  make shell-mailhog   Shell conteneur mailhog"
+	@echo "  make shell-mobile    Shell conteneur mobile (run --rm — à la demande)"
 	@echo "  make migrate     Migrations SQL versionnées (ledger idempotent)"
 	@echo "  make seed        Données de démo déterministes (JAMAIS en prod)"
 	@echo "  make test        Chaînage NF525 + healthcheck (dans le conteneur)"
@@ -79,6 +84,24 @@ build:
 
 shell-web:
 	$(COMPOSE) exec web sh
+
+# Shells interactifs — un par conteneur. Règles : exec pour les services
+# résidents, run --rm pour mobile (à la demande), psql direct pour postgres,
+# jamais -u root (les conteneurs tournent en non-root ou en leur user dédié).
+# (pas de shell-prisma-studio : le socle data est en SQL versionné — Adminer.)
+shell-postgres:
+	$(COMPOSE) exec postgres psql -U caisseflow -d caisseflow
+
+shell-adminer:
+	$(COMPOSE) exec adminer sh
+
+shell-mailhog:
+	$(COMPOSE) exec mailhog sh
+
+# Conteneur mobile à la demande (profile apk) : run --rm, le sh REMPLACE le
+# build APK (jamais les deux en même temps).
+shell-mobile:
+	$(COMPOSE) run --rm mobile sh
 
 # Migrations SQL versionnées (dans le conteneur web, ledger schema_migrations).
 migrate:
