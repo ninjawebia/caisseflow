@@ -69,7 +69,7 @@ utilisé ; `prisma-studio` est remplacé par **Adminer**. Toute mutation des DTO
 | `make test` / `make chain-check` / `make healthcheck` | Chaînage NF525 + santé des services |
 | `make smoke` | Test de fumée complet |
 | `make backup` / `make restore FILE=…` | pg_dump horodaté + rotation (14) |
-| `make build-apk` | APK Android reproducible → `apps/mobile/outputs/` |
+| `make build-apk` | APK Android reproducible → `output/apk/` (guide complet : `docs/BUILD-APK.md`) |
 | `make shell-web` | Shell dans le conteneur (npm autorisé — dedans seulement) |
 
 ## Production / préprod (Dokploy ou compose)
