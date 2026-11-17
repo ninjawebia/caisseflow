@@ -436,9 +436,9 @@ Chaque cas porte : **ID**, **titre**, **module**, **exigence PRD liée**, **prio
 
 ---
 
-## 21. Backlog de test — Phase 2 (PRD ch. 14.1/14.2 — NON EXÉCUTABLE tant que non implémenté)
+## 21. Backlog de test — Phase 2 (PRD ch. 14.1/14.2 — implémenté v0.2 : F1 le 2026-11-17, F2 le 2026-11-17)
 
-> Ajouté le 2026-11-17. Ces cas restent `NON TESTÉ` ; ils deviennent exécutables au moment du développement des fonctionnalités F1 (catégories) et F2 (photos d'articles). Aucun n'est bloquant pour le livrable v0.1.
+> Ajouté le 2026-11-17. **F1 et F2 sont désormais implémentés et exécutés** (batteries `tests/backlog-features.js` dans le conteneur, commit F1 `64102ab`, commit F2 `02d1c56`) : **TC-BO1-CAT 13/13 PASS, TC-BO1-PHOTO 12/12 PASS — TOTAL 25/25 PASS**. Les variantes d'implémentation sont notées sous chaque tableau. Les cas marqués `NON TESTÉ` concernent uniquement les surfaces RN (tablettes) non encore implémentées.
 
 ### 21.1 TC-BO1-CAT — Gestion des catégories (surface BO)
 
@@ -453,6 +453,8 @@ Chaque cas porte : **ID**, **titre**, **module**, **exigence PRD liée**, **prio
 | TC-BO1-CAT-007 | Second (mobile) | lecture via sync | `R` uniquement — pas d'endpoint d'écriture |
 | TC-BO1-CAT-008 | Gérant | nom invalide (« A » / 60+ car.) | `400` (DTO `@caisseflow/shared`) |
 | TC-BO1-CAT-009 | — | Vérifier aucune écriture journal_replica | Chaînage intact, aucune écriture (FISC non impacté) |
+
+> **Exécution du 2026-11-17** (dans le conteneur, `make test`) : les 9 cas **PASS** + 4 cas complémentaires (**13/13 PASS**) — 008b doublon → `409` ; 002b liste avec compteurs `nb_articles` ; 003b absence après suppression ; 010 trace `audit_log` (≥ 4 écritures). Note 007 : le « lecture via sync » est vérifié par le sync pull (catégories actives uniquement, filtrées `actif=true`).
 
 ### 21.2 TC-BO1-PHOTO — Photos des articles (surface BO)
 
@@ -469,6 +471,8 @@ Chaque cas porte : **ID**, **titre**, **module**, **exigence PRD liée**, **prio
 | TC-BO1-PHOTO-009 | — | Nom de fichier client malveillant (`../../x.php`, `<script>.jpg`) | ignoré — nom UUID serveur, aucune écriture hors du volume uploads |
 | TC-BO1-PHOTO-010 | — | Exports fiscaux avant/après suppression photo | identiques (les photos n'entrent pas dans les archives) |
 
+> **Exécution du 2026-11-17** (dans le conteneur, `make test`) : les 10 cas **PASS** + 2 cas complémentaires (**12/12 PASS**). Variantes d'implémentation (décisions F2) : pas de colonne `photo_url` en base — l'URL est **dérivée** `/api/articles/<id>/photo?v=<hash8>` avec `photo_file` (nom UUID sur disque) et `photo_hash` (SHA-256, = ETag) ; **pas de vignette 512 px** générée — l'original (≤ 2048 px, borné à l'upload) est servi tel quel avec cache privé ; PHOTO-007 : sans session **ni** jeton appareil → `403`, avec `Authorization: Bearer <device-token>` → `200` ; PHOTO-008 : le sync pull expose `photo_hash` (la tablette déduit l'URL) ; PHOTO-010 vérifié par invariant : `COUNT(journal_replica)` strictement identique avant/après (22 → 22).
+
 ### 21.3 Non-régression associée
 
-- TC-REG-nouveau : après implémentation, rejouer les cas BO existants (articles CRUD, sync pull, exports) + `make smoke` — la migration 0005 (`photo_url`, `actif` catégories) doit rester idempotente et le chaînage intact.
+- TC-REG-nouveau : après implémentation, rejouer les cas BO existants (articles CRUD, sync pull, exports) + `make smoke` — les migrations 0005 (`actif` catégories) et 0006 (`photo_file`/`photo_hash`, **pas** `photo_url`) doivent rester idempotentes et le chaînage intact. **Exécuté 2026-11-17 : `make smoke` PASS, chaînage SHA-256 vérifié intact (FISC-2 ✓), 25/25 PASS.**

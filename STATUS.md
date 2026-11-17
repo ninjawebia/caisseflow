@@ -68,3 +68,12 @@ Anomalies constatées pendant la passe : les 403 initiaux venaient du script de 
 | Nettoyage hôte | ✅ appliqué (17/11) : `apps/web/node_modules`, `apps/web/.next`, cache npm, conteneur `caisseflow-db` — supprimés ; recréés dans les conteneurs |
 | Backlog | 17/11 : F1 « catégories » + F2 « photos d'articles » (PRD ch. 14.1/14.2, BLUEPRINT § 9, TEST-PLAN § 21 = 19 cas NON TESTÉ, AGENT/SKILL annexe) — RBAC : gérant seul en écriture, hors journal NF525 (audit_log) |
 | Nettoyage hôte | Proposé à validation : `app/node_modules` (518 M), `app/.next` (50 M), cache npm — non supprimés sans accord |
+
+## Backlog F1 + F2 — implémentés (2026-11-17)
+
+| Module | Contenu | Tests (dans le conteneur) | Commit |
+| --- | --- | --- | --- |
+| F1 CRUD catégories | migration `0005_categories_actif.sql` ; DTO `validateCategory` (@caisseflow/shared) ; GET/POST `/api/categories` + PATCH/DELETE `/api/categories/[id]` (gérant seul, audit_log, delete refusé si articles présents 400+nb_articles) ; sync pull catégories actives uniquement ; panneau UI `/menu` (créer/renommer/archiver/supprimer confirmé en 2 étapes) | **TC-BO1-CAT 13/13 PASS** | `64102ab` (poussé) |
+| F2 photos d'articles | migration `0006_articles_photo.sql` (`photo_file`/`photo_hash`, pas de `photo_url` — URL dérivée) ; `lib/uploads.js` (magic bytes JPEG/PNG/WebP, ≤ 2 Mo, ≤ 2048 px, nom UUID serveur, archivage 30 j + purge) ; `/api/articles/[id]/photo` GET (ETag SHA-256 + 304, auth session **ou** Bearer device) / POST multipart / DELETE ; volume Docker `web_uploads` (chown su-exec au démarrage, stages dev + runtime) ; sync pull `photo_hash` ; UI zone photo éditeur + vignettes grille | **TC-BO1-PHOTO 12/12 PASS — TOTAL make test 25/25 PASS** + `make smoke` PASS + chaînage intact (FISC-2 ✓) | `02d1c56` (poussé) |
+
+Correctifs pendant le cycle F2 (pièges documentés) : `params` Promise Next 15 → `(await ctx.params).id` ; volume `web_uploads` root-owned au copy-up → chown 1000:1000 via `su-exec` au démarrage ; lockfile racine régénéré (héritage bump RN 0.76.9 + expo-*) ; `detectImage` absent du `module.exports` de `lib/uploads.js` (cause du GET 500 — POST passait car `validate`/`save` étaient exportés) ; imports lib photo route en nommés.
