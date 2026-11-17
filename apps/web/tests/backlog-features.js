@@ -54,6 +54,7 @@ async function main() {
   // TC-BO1-CAT-004 : suppression refusée si non vide (article rattaché)
   const art = await fetch(`${B}/api/articles`, { method: "POST", headers: H(jar), body: JSON.stringify({ nom: `Article test cat ${SFX}`, prix_ttc: 5, taux_tva: 10, categorie_id: cat.category.id, actif: true }) });
   if (art.status !== 201) throw new Error(`article → ${art.status} ${await art.text()}`);
+  const catArtId = (await art.json()).article.id;
   const del1 = await fetch(`${B}/api/categories/${cat.category.id}`, { method: "DELETE", headers: H(jar), body: "{}" });
   const del1b = await del1.json().catch(() => ({}));
   check("TC-BO1-CAT-004", del1.status === 400 && del1b.nb_articles === 1, `HTTP ${del1.status}`);
@@ -67,7 +68,7 @@ async function main() {
   check("TC-BO1-CAT-007", pull.status === 200 && !(pullb.categories || []).some((c) => c.id === cat.category?.id), "archivée absente du sync pull");
 
   // Ré-association puis suppression (TC-BO1-CAT-003)
-  const uncat = await fetch(`${B}/api/articles/${(await art.json()).article.id}`, {
+  const uncat = await fetch(`${B}/api/articles/${catArtId}`, {
     method: "PATCH", headers: H(jar),
     body: JSON.stringify({ nom: `Article test cat ${SFX}`, prix_ttc: 5, taux_tva: 10, categorie_id: null, actif: true }),
   });
@@ -77,6 +78,10 @@ async function main() {
   const list2 = await fetch(`${B}/api/categories`, { headers: { Origin: B, Cookie: jar } });
   const gone = !((await list2.json()).categories || []).some((c) => c.id === cat.category?.id);
   check("TC-BO1-CAT-003b", gone, "catégorie absente après suppression");
+
+  // Nettoyage rerun-safe : l'article de test est supprimé (aucune accumulation
+  // d'articles résiduels entre les runs — le garbage a fait échouer MED-010).
+  await fetch(`${B}/api/articles/${catArtId}`, { method: "DELETE", headers: H(jar), body: "{}" });
 
   // TC-BO1-CAT-006 : comptable en écriture → 403
   const forbidden = await fetch(`${B}/api/categories`, { method: "POST", headers: H(jarC), body: JSON.stringify({ nom: `Interdit ${SFX}` }) });
@@ -172,11 +177,13 @@ async function main() {
   const inPull = (pull2b.articles || []).find((a) => a.id === art2id);
   check("TC-BO1-PHOTO-008", pull2.status === 200 && inPull && typeof inPull.photo_hash === "string", "photo_hash dans le sync pull");
 
-  // TC-BO1-PHOTO-004 : remplacement → ancienne photo archivée
+  // TC-BO1-PHOTO-004 : remplacement → v0.4 l'ancienne photo RESTE dans la
+  // bibliothèque (asset réutilisable, pas d'archivage — le cycle de vie de
+  // l'asset est indépendant de l'article).
   const PNG2x2 = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVR42mNkYPhfz0BEYBxVmgEAAVoB7TG6CJ8AAAAASUVORK5CYII=", "base64");
   const rep = await up(PNG2x2, "v2.png");
-  const archived = fs.readdirSync(require("path").join(uploadsLib.uploadDir(), "archived")).length;
-  check("TC-BO1-PHOTO-004", rep.status === 201 && archived >= 1, `${archived} fichier(s) archivé(s)`);
+  const mediaCount = (await pool.query("SELECT COUNT(*)::int AS n FROM media")).rows[0].n;
+  check("TC-BO1-PHOTO-004", rep.status === 201 && mediaCount >= 2, `${mediaCount} asset(s) en bibliothèque — ancienne photo conservée`);
 
   // TC-BO1-PHOTO-010 : aucune écriture journal_replica (invariant NF525)
   const after = await pool.query("SELECT COUNT(*)::int AS n FROM journal_replica");
@@ -188,6 +195,9 @@ async function main() {
   const db2 = await pool.query("SELECT photo_file, photo_hash FROM articles WHERE id = $1", [art2id]);
   check("TC-BO1-PHOTO-005", del.status === 200 && get2.status === 404 && db2.rows[0].photo_file === null, `HTTP ${del.status}/${get2.status}`);
 
+  // Nettoyage : l'article de test est désactivé (l'asset PNG reste en bibliothèque)
+  await fetch(`${B}/api/articles/${art2id}`, { method: "DELETE", headers: { "Content-Type": "application/json", Origin: B, Cookie: jar }, body: "{}" });
+
   console.log(`\nTC-BO1-PHOTO : ${pass - p1} PASS, ${fail - f1} FAIL`);
 
   // ============ Batterie UI /menu (SSR — améliorations v0.3) ============
@@ -198,7 +208,7 @@ async function main() {
   check("TC-UI-MENU-001-recherche", page2.status === 200 && html.includes('id="article-search"') && html.includes("Rechercher un article"), "champ 🔍 présent");
   check("TC-UI-MENU-002-tri", html.includes("sort-nom") && html.includes("sort-cat"), "en-têtes triables");
   check("TC-UI-MENU-003-ttc-live", html.includes("ttc-live"), "affichage TTC temps réel");
-  check("TC-UI-MENU-004-photo-création", html.includes("photo-input") && html.includes("Ajouter une photo"), "zone photo dès la création");
+  check("TC-UI-MENU-004-photo-création", html.includes("photo-input") && html.includes("Téléverser une image") && html.includes("Choisir dans la bibliothèque"), "zone photo (2 modes) dès la création");
   console.log(`\nTC-UI-MENU : ${pass - u1} PASS, ${fail - u2} FAIL`);
 
   console.log(`\nTOTAL : ${pass} PASS, ${fail} FAIL`);

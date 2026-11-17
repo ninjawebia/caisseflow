@@ -32,7 +32,8 @@ export default async function TicketPage() {
   return (
     <Shell user={user} active="/ticket-modele" licence={licence}>
       <PageHeader title="Modèle de ticket" subtitle="Champs libres personnalisables — mentions légales NF525 verrouillées (IMP-4)" />
-      <TicketClient template={tpl.rows[0] || { logo_text: "", mentions: "" }} legal={legal} />
+      <TicketClient template={tpl.rows[0] || { logo_text: "", mentions: "" }} legal={legal}
+        restaurant={{ nom: rest.rows[0]?.nom || "", siret: rest.rows[0]?.siret || "", adresse: rest.rows[0]?.adresse || "" }} />
     </Shell>
   );
 }

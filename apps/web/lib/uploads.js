@@ -76,7 +76,7 @@ function validate(buffer) {
   const dim = dimensions(buffer, type);
   if (!dim) return { ok: false, error: "Dimensions illisibles — JPEG (baseline/progressif), PNG ou WebP (VP8/VP8X) requis" };
   if (dim.w > MAX_DIM || dim.h > MAX_DIM) return { ok: false, error: `Dimensions excessives (max ${MAX_DIM} px)` };
-  return { ok: true, ext: type, hash: crypto.createHash("sha256").update(buffer).digest("hex") };
+  return { ok: true, ext: type, hash: crypto.createHash("sha256").update(buffer).digest("hex"), w: dim.w, h: dim.h };
 }
 
 // Écriture : nom UUID serveur (jamais le nom client — injection de chemin/XSS).

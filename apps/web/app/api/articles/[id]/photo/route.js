@@ -5,7 +5,7 @@ import { pool } from "../../../../../lib/db";
 import { assertSameOrigin, json, audit } from "../../../../../lib/http";
 import { licenceGate } from "../../../../../lib/license";
 import fs from "fs";
-import { validate, save, archive, detectImage, ALLOWED, pathOf } from "../../../../../lib/uploads";
+import { validate, save, detectImage, ALLOWED, pathOf } from "../../../../../lib/uploads";
 
 // Chargement de l'article du restaurant courant (session web OU jeton appareil).
 // Les tablettes lisent les photos via ce même endpoint (PRD 14.2, sync pull).
@@ -92,15 +92,66 @@ export async function POST(req, ctx) {
   const v = validate(buf);
   if (!v.ok) return json({ error: v.error }, 400);
 
-  const old = await pool.query("SELECT photo_file FROM articles WHERE id = $1", [id]);
-  const name = save(buf, v.ext);
-  if (old.rows[0]?.photo_file) archive(old.rows[0].photo_file);
+  // Bibliothèque média (v0.4) : le contenu est DÉDUPLIQUÉ par hash — un
+  // fichier déjà présent est réutilisé (aucun nouveau fichier stocké) ;
+  // sinon il est enregistré ET ajouté à la bibliothèque. L'ancienne photo de
+  // l'article n'est PAS archivée : elle reste un asset réutilisable de la
+  // bibliothèque (le cycle de vie de l'asset est indépendant de l'article).
+  const dup = await pool.query(
+    "SELECT file, hash FROM media WHERE restaurant_id = $1 AND hash = $2",
+    [user.restaurantId, v.hash]
+  );
+  let name;
+  if (dup.rows[0]) {
+    name = dup.rows[0].file;
+  } else {
+    name = save(buf, v.ext);
+    await pool.query(
+      `INSERT INTO media (restaurant_id, file, hash, mime, bytes, width, height, created_by_email)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (restaurant_id, hash) DO NOTHING`,
+      [user.restaurantId, name, v.hash, ALLOWED[v.ext], buf.length, v.w, v.h, user.email]
+    );
+  }
   await pool.query("UPDATE articles SET photo_file = $1, photo_hash = $2 WHERE id = $3", [name, v.hash, id]);
-  await audit(user, "photo_set", "articles", id, { hash: v.hash.slice(0, 12), size: buf.length });
+  await audit(user, "photo_set", "articles", id, { hash: v.hash.slice(0, 12), size: buf.length, dedup: !!dup.rows[0] });
   return json({ ok: true, hash: v.hash.slice(0, 12) }, 201);
 }
 
-// DELETE /api/articles/[id]/photo — gérant only ; fichier archivé, champ NULL.
+// PATCH /api/articles/[id]/photo — réutiliser un média de la bibliothèque
+// (gérant only, JSON {media_id}). Le contenu est déjà en base : on pointe
+// l'article dessus (photo_file/photo_hash dénormalisés) — aucune écriture
+// disque. L'ancienne photo reste dans la bibliothèque.
+export async function PATCH(req, ctx) {
+  const { id } = await ctx.params;
+  const csrf = assertSameOrigin(req);
+  if (csrf) return csrf;
+  const user = await getSessionUser(await cookies());
+  if (!user || !can(user.role, "menu") || !user.restaurantId) return json({ error: "Accès refusé" }, 403);
+  const lic = await licenceGate(user.restaurantId);
+  if (!lic.ok) return json({ error: lic.error }, 403);
+
+  const a = await pool.query(
+    "SELECT id FROM articles WHERE id = $1 AND restaurant_id = $2",
+    [id, user.restaurantId]
+  );
+  if (!a.rows[0]) return json({ error: "Article introuvable" }, 404);
+
+  const body = await req.json().catch(() => null);
+  if (!body?.media_id) return json({ error: "media_id manquant" }, 400);
+  const m = await pool.query(
+    "SELECT file, hash FROM media WHERE id = $1 AND restaurant_id = $2",
+    [body.media_id, user.restaurantId]
+  );
+  if (!m.rows[0]) return json({ error: "Média introuvable dans la bibliothèque" }, 404);
+
+  await pool.query("UPDATE articles SET photo_file = $1, photo_hash = $2 WHERE id = $3", [m.rows[0].file, m.rows[0].hash, id]);
+  await audit(user, "photo_set", "articles", id, { media_id: body.media_id, hash: m.rows[0].hash.slice(0, 12), source: "bibliotheque" });
+  return json({ ok: true, hash: m.rows[0].hash.slice(0, 12) });
+}
+
+// DELETE /api/articles/[id]/photo — gérant only ; DéLIAISON simplement
+// (champ NULL) : l'asset reste dans la bibliothèque, réutilisable pour un autre
+// article. La suppression DISQUE passe par /api/media/[id] (refusée si utilisée).
 export async function DELETE(req, ctx) {
   const { id } = await ctx.params;
   const csrf = assertSameOrigin(req);
@@ -119,8 +170,7 @@ export async function DELETE(req, ctx) {
   if (!r.rows[0]) return json({ error: "Article introuvable" }, 404);
   if (!r.rows[0].photo_file) return json({ error: "Aucune photo à supprimer" }, 404);
 
-  archive(r.rows[0].photo_file);
   await pool.query("UPDATE articles SET photo_file = NULL, photo_hash = NULL WHERE id = $1", [id]);
-  await audit(user, "photo_delete", "articles", id, {});
+  await audit(user, "photo_delete", "articles", id, { note: "déliaison — asset conservé en bibliothèque" });
   return json({ ok: true });
 }

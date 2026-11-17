@@ -1,5 +1,6 @@
 "use client";
 import { useState, useMemo } from "react";
+import MediaPicker from "./MediaPicker";
 
 // Menu management (S-03). Gérant only (PRD 3.2). All mutations go through the
 // API which re-validates server-side and writes the audit trail (BO-1).
@@ -84,7 +85,8 @@ export default function MenuClient({ categories, articles }) {
     const article = res.article;
     setItems((prev) => editing ? prev.map((a) => (a.id === editing ? article : a)) : [...prev, article]);
 
-    // Photo choisie AVANT la création : envoyée tout de suite au nouvel article.
+    // Photo choisie AVANT la création : fichier (upload direct) ou média de
+    // la bibliothèque (assignation) — envoyée tout de suite au nouvel article.
     let suffixe = "";
     if (pendingPhoto?.file) {
       const up = await uploadTo(article.id, pendingPhoto.file);
@@ -92,6 +94,9 @@ export default function MenuClient({ categories, articles }) {
         setItems((prev) => prev.map((a) => (a.id === article.id ? { ...a, photo_hash: up.hash } : a)));
         suffixe = " avec sa photo";
       }
+    } else if (pendingPhoto?.mediaId) {
+      const ok = await assignMedia(article.id, pendingPhoto.mediaId, pendingPhoto.hash);
+      if (ok) suffixe = " avec sa photo";
     }
     setMsg({ tone: "success", text: (editing ? "Article modifié" : "Article créé") + suffixe });
     resetForm();
@@ -145,6 +150,40 @@ export default function MenuClient({ categories, articles }) {
 
   function dropPendingPhoto() {
     setPendingPhoto((p) => { if (p?.url) URL.revokeObjectURL(p.url); return null; });
+  }
+
+  // --- Bibliothèque média (v0.4) — réutiliser une image déjà téléversée ---
+  const [libOpen, setLibOpen] = useState(false);
+
+  // Assignation d'un asset de la bibliothèque à un article (PATCH JSON).
+  async function assignMedia(articleId, mediaId, hash) {
+    setPhotoBusy(true);
+    setPhotoMsg(null);
+    try {
+      const r = await fetch(`/api/articles/${articleId}/photo`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ media_id: mediaId }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setPhotoMsg({ tone: "danger", text: data.error || "Assignation refusée" });
+        return false;
+      }
+      setItems((prev) => prev.map((a) => (a.id === articleId ? { ...a, photo_hash: data.hash || hash } : a)));
+      setPhotoMsg({ tone: "success", text: "Photo mise à jour" });
+      return true;
+    } catch {
+      setPhotoMsg({ tone: "danger", text: "Serveur indisponible — réessayez" });
+      return false;
+    } finally { setPhotoBusy(false); }
+  }
+
+  // Sélection dans la modale : édition → assignation immédiate ; création →
+  // stockée en attente (comme un fichier), assignée juste après le POST.
+  function pickFromLibrary(media) {
+    if (editing) assignMedia(editing, media.id, media.hash);
+    else setPendingPhoto((p) => { if (p?.url) URL.revokeObjectURL(p.url); return { mediaId: media.id, hash: media.hash, url: `/api/media/${media.id}/photo?v=${media.hash.slice(0, 8)}` }; });
   }
 
   async function deletePhoto() {
@@ -267,6 +306,8 @@ export default function MenuClient({ categories, articles }) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <MediaPicker open={libOpen} onClose={() => setLibOpen(false)} onSelect={pickFromLibrary}
+        currentHash={editing ? items.find((a) => a.id === editing)?.photo_hash : pendingPhoto?.hash} />
       <section id="article-form" className="lg:col-span-2 flex flex-col gap-6">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
           <h2 className="text-lg font-semibold text-slate-900 mb-4">{editing ? "Modifier l'article" : "Nouvel article"}</h2>
@@ -323,10 +364,16 @@ export default function MenuClient({ categories, articles }) {
                   )}
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className={`inline-flex items-center justify-center h-8 px-3 text-xs font-medium rounded-lg border transition-colors ${photoBusy ? "opacity-50 pointer-events-none border-slate-200 text-slate-400" : "border-slate-300 text-slate-700 hover:bg-slate-50 cursor-pointer"}`}>
-                    {photoBusy ? "Envoi…" : editing && items.find((a) => a.id === editing)?.photo_hash ? "Remplacer" : "Ajouter une photo"}
-                    <input type="file" accept="image/jpeg,image/png,image/webp" onChange={pickPhoto} disabled={photoBusy} className="sr-only" data-action="photo-input" />
-                  </label>
+                  <div className="flex flex-wrap gap-1">
+                    <label className={`inline-flex items-center justify-center h-8 px-3 text-xs font-medium rounded-lg border transition-colors ${photoBusy ? "opacity-50 pointer-events-none border-slate-200 text-slate-400" : "border-slate-300 text-slate-700 hover:bg-slate-50 cursor-pointer"}`}>
+                      {photoBusy ? "Envoi…" : editing && items.find((a) => a.id === editing)?.photo_hash ? "Téléverser" : "Téléverser une image"}
+                      <input type="file" accept="image/jpeg,image/png,image/webp" onChange={pickPhoto} disabled={photoBusy} className="sr-only" data-action="photo-input" />
+                    </label>
+                    <button type="button" onClick={() => setLibOpen(true)} disabled={photoBusy} data-action="photo-library"
+                      className="h-8 px-3 text-xs font-medium text-blue-700 border border-blue-200 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50 disabled:pointer-events-none">
+                      Choisir dans la bibliothèque
+                    </button>
+                  </div>
                   {editing && items.find((a) => a.id === editing)?.photo_hash && (
                     <button type="button" onClick={deletePhoto} disabled={photoBusy} data-action="photo-delete"
                       className="h-8 px-3 text-xs font-medium text-rose-700 hover:bg-rose-50 rounded-lg transition-colors text-left">Supprimer la photo</button>

@@ -1,10 +1,12 @@
 "use client";
 import { useState } from "react";
+import TicketPreview from "./TicketPreview";
 
 // S-11 — Ticket template (S-11 / IMP-4). Free fields (logo text, footer
 // mentions) are editable; the legal mentions required by NF525 are locked and
-// always printed by the caisse app (they are NOT configurable).
-export default function TicketClient({ template, legal }) {
+// always printed by the caisse app (they are NOT configurable). L'APERÇU
+// (ticket 58 mm) se met à jour en direct pendant la saisie.
+export default function TicketClient({ template, legal, restaurant }) {
   const [form, setForm] = useState({ logo_text: template.logo_text || "", mentions: template.mentions || "" });
   const [msg, setMsg] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -51,6 +53,13 @@ export default function TicketClient({ template, legal }) {
             {busy ? "Enregistrement…" : "Enregistrer le modèle"}
           </button>
         </form>
+
+        {/* Aperçu temps réel — ticket 58 mm (rendu approchant ESC/POS) */}
+        <div className="mt-6 pt-6 border-t border-slate-100">
+          <h3 className="text-sm font-semibold text-slate-900 mb-1">Aperçu du ticket</h3>
+          <p className="text-xs text-slate-500 mb-4">Papier 58 mm — mis à jour en direct pendant la saisie du logo et des mentions.</p>
+          <TicketPreview restaurant={restaurant} template={form} />
+        </div>
       </section>
 
       <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
