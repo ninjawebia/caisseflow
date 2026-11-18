@@ -190,4 +190,4 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | Tests | mobile **116/116 PASS** (dont 9 sur une vraie base SQLite pour M4) ; web **106/106 PASS** ; total **222 PASS / 0 FAIL** ; `make smoke` PASS ; contrôle de syntaxe Babel 28 fichiers |
 | APK | `output/apk/caisseflow-0.8.0-release.apk` — **versionName 0.8.0, versionCode 6** (`aapt2`), `libexpo-sqlite`/`libexpo-crypto`/`libexpo-secure-store` présents, bundle contenant `Carte locale`, `prix_ttc_cents`, `tables_resto`, `Synchroniser` et le SQL de désactivation ; ancien APK 0.7.0 retiré |
 | Écart PRD | aucun (PRD 4.2). Photos d'articles (`photo_hash` stocké, image non téléchargée), variantes/suppléments et gestion des salles côté caisse restent hors périmètre approuvé (candidats backlog, non implémentés) |
-| Commit | voir `git log --oneline --grep="module-M4"` |
+| Commit | `e7fe576` (poussé) |
