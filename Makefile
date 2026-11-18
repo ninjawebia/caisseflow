@@ -144,8 +144,14 @@ seed:
 	$(COMPOSE) exec web sh -c "cd /repo/apps/web && node db/seed.js"
 
 # Tests : chaînage NF525 + healthcheck, tout dans les conteneurs.
-test: license-devkey
+# Inclut le socle mobile (tests Node purs : aucun node sur l'hôte).
+test: license-devkey test-mobile
 	$(COMPOSE) exec web sh -c "cd /repo/apps/web && npm test"
+
+# Socle mobile (M1) — tests unitaires SANS module natif : image node légère,
+# sources montées en lecture seule (les node_modules de l'app ne sont pas requis).
+test-mobile:
+	docker run --rm -v "$$PWD/apps/mobile":/app -w /app node:22-alpine npm test
 
 chain-check:
 	$(COMPOSE) exec postgres /scripts/test-nf525-chain.sh

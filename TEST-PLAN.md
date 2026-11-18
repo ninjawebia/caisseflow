@@ -577,3 +577,32 @@ Chaque cas porte : **ID**, **titre**, **module**, **exigence PRD liée**, **prio
 
 **Exécution du 2026-11-18** (dans le conteneur, `make test`) : **TC-DEV 33/33 PASS** — total projet **91/91 PASS** (29 backlog + 13 LIC + 16 MED/TKT + 33 DEV), `make smoke` PASS.
 Batterie **rerun-safe** : poste dédié `POSTE-77`, jeton aléatoire à chaque run, lignes créées par le run retirées en fin de passage (le journal d'audit, lui, reste — append-only).
+
+## 26. Socle mobile de la caisse — TC-M1 (PRD ch. 4.1.10, SYNC-4, implémenté le 2026-11-18)
+
+> Première brique exécutable de la caisse Android : base SQLite locale migrée
+> (`PRAGMA user_version`, WAL), jeton d'appareil dans le Keystore Android
+> (`expo-secure-store`), enrôlement prouvé par un vrai `POST /api/sync/pull`,
+> écran d'accueil de contrôle (licence, compteurs, connexion). Les tests sont
+> **Node purs** (`node --test`, image `node:22-alpine`) : aucun module natif
+> requis, donc exécutables dans le conteneur et sur n'importe quelle CI.
+
+| ID | Précondition | Action | Attendu | Statut |
+| --- | --- | --- | --- | --- |
+| TC-M1-CFG-01..03 | — | Adresses complètes, schéma absent, barres finales | Normalisées (`http://`, casse, sans `/` final) | PASS |
+| TC-M1-CFG-04 | — | Casse mixte `HTTP://Serveur.Local` | Normalisée en minuscules | PASS |
+| TC-M1-CFG-05 | — | 10 adresses invalides (ftp, identifiants, port hors bornes, query, espace) | Toutes refusées | PASS |
+| TC-M1-CFG-06/07 | — | `apiUrl` + valeur par défaut | Composition correcte, route sans `/` refusée | PASS |
+| TC-M1-TOK-01..03 | — | Jeton réel 43 car., copier-coller multi-lignes, 10 jetons invalides | Seul le jeton valide est accepté, espaces retirés | PASS |
+| TC-M1-TOK-04/05 | — | Masquage | `abcd…wxyz`, jamais le jeton complet ; entrée courte `••••` | PASS |
+| TC-M1-VER-01..04 | — | `parseVersion`, comparaisons, seuil | Numérique (0.10 > 0.9), versions invalides rejetées | PASS |
+| TC-M1-ENR-01 | Serveur OK | `enroll` avec jeton valide | `200` : URL normalisée, jeton conservé, licence + compteurs ; `Bearer` et `{}` envoyés | PASS |
+| TC-M1-ENR-02/03 | — | `401` / `403` | Codes `TOKEN` / `LICENCE` (motif serveur repris) | PASS |
+| TC-M1-ENR-04/05 | — | `500` / réponse non JSON | Code `SERVER` | PASS |
+| TC-M1-ENR-06/07 | — | Réseau coupé / serveur muet (20 ms) | Codes `NETWORK` (« injoignable » / « délai dépassé ») | PASS |
+| TC-M1-ENR-08/09 | — | Jeton mal formé / adresse invalide | Refus **avant** tout appel réseau (0 requête) | PASS |
+| TC-M1-ENR-10 | `minAppVersion` 9.0.0 | App 0.5.0 | Code `VERSION` (mise à jour obligatoire, SEC-2) | PASS |
+| TC-M1-ENR-11/12 | — | `checkConnection` (OK, révoqué, libellés licence) | Licence et compteurs corrects, `TOKEN` si révoqué | PASS |
+| TC-M1-MIG-01..06 | — | Planificateur de migrations | Contiguïté, base neuve → v1, base à jour → 0, base plus récente → refus, versions invalides rejetées, migration 1 = `settings` seulement | PASS |
+
+**Exécution du 2026-11-18** : `npm test` dans `node:22-alpine` → **34/34 PASS** (5 fichiers). Total projet : **91 tests web + 34 tests mobiles = 125 PASS, 0 FAIL** ; `make smoke` PASS ; APK `0.5.0` construit et vérifié (`aapt2` + libs natives `libexpo-sqlite.so` par ABI + bundle contenant le schéma `settings`).

@@ -132,3 +132,17 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | UX | jeton affiché en encart ambre avec bouton **Copier**, avertissement « une seule fois », masquage manuel ; révocation en 2 temps (Confirmer/Annuler) ; états vide, occupé, erreur serveur ; table responsive |
 | Écart PRD | aucun (périmètre PRD ch. 4.1.10 / SYNC-4) |
 | Commit | `dc672c5` (poussé) |
+
+## Module 20 — Socle mobile de la caisse (M1, 2026-11-18)
+
+| Élément | Résultat |
+| --- | --- |
+| Besoin | L'APK n'était qu'un écran statique : aucun stockage local, aucune identité d'appareil, aucune preuve que l'enrôlement M0 fonctionne depuis une tablette. Sans socle, impossible d'implémenter le journal fiscal (M2). |
+| Livré | base SQLite locale migrée (`expo-sqlite`, WAL, `PRAGMA user_version`) ; jeton + adresse serveur dans le Keystore (`expo-secure-store`, jamais en clair, jamais journalisés) ; écran d'enrôlement (adresse + jeton, contrôle local 43 caractères, preuve par `POST /api/sync/pull`, erreurs typées) ; écran d'accueil (poste enrôlé, licence, compteurs menu/staff/tables, contrôle de connexion, réinitialisation confirmée) ; démarrage machine à états (boot → enrôlement ou accueil, écran de reprise si échec) |
+| Architecture | `src/core/*` = logique **pure** (config, jeton, versions, HTTP injectable, enrôlement, planificateur de migrations) → testable sans appareil ; `src/db`, `src/storage`, `src/screens` = adaptateurs natifs minces ; navigation volontairement minimale (2 écrans) au M1 |
+| Sécurité | jeton uniquement en `Authorization: Bearer` ; masqué à l'écran (`abcd…wxyz`) ; refus d'une base écrite par une app plus récente ; aucune donnée métier envoyée à l'enrôlement (le pull est en lecture) |
+| Tests | **TC-M1 34/34 PASS** (`node --test`, image `node:22-alpine`, `make test-mobile`) ; total projet **125 PASS / 0 FAIL** (91 web + 34 mobile) ; `make smoke` PASS |
+| APK | `output/apk/caisseflow-0.5.0-release.apk` — `fr.caisseflow.app` **versionName 0.5.0, versionCode 3**, minSdk 24 (vérifié `aapt2 dump badging`) ; libs natives `libexpo-sqlite.so` présentes (arm64-v8a, armeabi-v7a, x86, x86_64) ; bundle contient `CREATE TABLE ... settings` et `/api/sync/pull` (preuve d'intégration) ; build 6 m 49 s |
+| Outillage | nouvelle cible `make test-mobile` (aucun `node`/`npm` sur l'hôte), chaînée dans `make test` ; `npm test` mobile ajouté au `package.json` |
+| Écart PRD | aucun (périmètre PRD ch. 4.1.10 / SYNC-4) — la pile d'écrans POS arrive avec M5 |
+| Commit | voir `git log --oneline --grep="module-M1"` |
