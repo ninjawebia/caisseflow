@@ -176,3 +176,18 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | Outillage | `make test-mobile` s'exécute désormais dans **l'image mobile** (bcryptjs installé) avec `src`, `tests` et `App.js` montés en lecture seule — toujours aucun `node`/`npm` sur l'hôte |
 | Écart PRD | aucun (PRD 4.1.1). La biométrie, le changement de PIN à bord et le QR d'enrôlement restent hors périmètre approuvé (candidats backlog, non implémentés) |
 | Commit | `a384984` (poussé) |
+
+## Module 23 — Données de référence locales (M4, 2026-11-19)
+
+| Élément | Résultat |
+| --- | --- |
+| Besoin | La caisse doit afficher la carte (catégories, articles, TVA) et connaître ses tables **sans réseau** (PRD 4.2, SYNC-3/SYNC-5). M3 savait qui opère ; M4 fournit sur quoi opérer. |
+| Livré | migration 4 (`categories`, `articles`, `tables_resto`, index catégorie) ; `core/money.js` (centimes entiers, plafond 10 000 €, format français sans `Intl`, somme de lignes) ; `core/reference.js` (validation stricte des lignes du pull, `groupMenu`, `formatSyncDate`) ; `db/settings.js` (réglages CJS) ; `db/reference-sql.js` (UPSERT + désactivations) ; `db/reference.js` (`saveReference` transactionnel, compteurs, menu, tables, `last.pull.at`, licence en cache) ; `App.js` (`syncNow` delta, sync silencieux au démarrage, état de carte, persistance de la carte dès l'enrôlement) ; `HomeScreen` (« Carte locale » : compteurs, dernière synchro, bouton Synchroniser, état vide et erreur ; licence lue dans le cache) |
+| Contrat de synchronisation | Articles en **delta** (`since` = heure SERVEUR du dernier pull réussi) : un article absent du lot n'est **jamais** désactivé, une désactivation est transmise explicitement (`actif: false`). Catégories, tables et personnel en pull **complet** : un absent est désactivé localement, jamais supprimé (une commande peut y faire référence). Toute la carte est écrite dans **une transaction**. |
+| Montants | Prix stockés en **centimes entiers** (`prix_ttc_cents`, CHECK entier 0..1 000 000) : aucun flottant dans les totaux futurs (ticket, ventilation TVA). Un prix absent est refusé — il ne devient jamais gratuit. |
+| Défense en profondeur | Les lignes reçues sont validées AVANT écriture (UUID, nom, prix, TVA à une décimale, places 1..20, version numérique) ; une ligne douteuse est rejetée et comptée, les autres passent. `actif` des catégories est désormais transmis par le pull web (les catégories archivées restent absentes du lot → désactivation locale). |
+| Sécurité | Aucune donnée sensible dans la carte ; la licence affichée vient du cache local (lisible hors ligne) ; le pull reste protégé par le jeton d'appareil et le gate licence (403). |
+| Tests | mobile **116/116 PASS** (dont 9 sur une vraie base SQLite pour M4) ; web **106/106 PASS** ; total **222 PASS / 0 FAIL** ; `make smoke` PASS ; contrôle de syntaxe Babel 28 fichiers |
+| APK | `output/apk/caisseflow-0.8.0-release.apk` — **versionName 0.8.0, versionCode 6** (`aapt2`), `libexpo-sqlite`/`libexpo-crypto`/`libexpo-secure-store` présents, bundle contenant `Carte locale`, `prix_ttc_cents`, `tables_resto`, `Synchroniser` et le SQL de désactivation ; ancien APK 0.7.0 retiré |
+| Écart PRD | aucun (PRD 4.2). Photos d'articles (`photo_hash` stocké, image non téléchargée), variantes/suppléments et gestion des salles côté caisse restent hors périmètre approuvé (candidats backlog, non implémentés) |
+| Commit | voir `git log --oneline --grep="module-M4"` |

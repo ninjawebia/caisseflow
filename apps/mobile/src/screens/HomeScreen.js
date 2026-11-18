@@ -1,39 +1,23 @@
-import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { colors, font, licenceTone, radius, space } from "../ui/theme";
 import { maskToken } from "../core/token";
 import { roleLabel } from "../core/auth";
-import { checkConnection } from "../core/enrollment";
+import { formatSyncDate } from "../core/reference";
 
-// Accueil de la caisse (M1) — prouve le socle : enrôlement persistant, base
-// SQLite migrée, serveur joignable, état de licence. M3 ajoute l'opérateur
-// connecté et le verrouillage de session. La prise de commande arrive en M5.
-export default function HomeScreen({ enrollment, schema, user, onReset, onLock, onActivity, appVersion }) {
-  const [check, setCheck] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-
-  const runCheck = useCallback(async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await checkConnection(enrollment);
-      setCheck(res);
-    } catch (e) {
-      setCheck(null);
-      setError(e && e.message ? e.message : "Vérification impossible");
-    } finally {
-      setBusy(false);
-    }
-  }, [enrollment]);
-
-  useEffect(() => { runCheck(); }, [runCheck]);
-
+// Accueil de la caisse (M1→M4) — prouve le socle et l'état RÉEL du poste :
+// enrôlement persistant, base SQLite migrée, journal fiscal vérifié, carte
+// locale disponible hors ligne (catégories, articles, tables, matricules).
+// M3 ajoute l'opérateur connecté et le verrouillage de session ; la prise de
+// commande arrive avec M5 (cette carte en est la source).
+export default function HomeScreen({
+  enrollment, schema, user, reference, syncBusy, syncError, onSync,
+  onReset, onLock, onActivity, appVersion,
+}) {
   function confirmReset() {
     Alert.alert(
       "Réinitialiser l'enrôlement ?",
-      "Le jeton sera effacé de cette tablette. Le journal fiscal local n'est jamais supprimé par cette action ; un nouveau jeton sera nécessaire pour synchroniser.",
+      "Le jeton sera effacé de cette tablette. Le journal fiscal et la carte locale ne sont jamais supprimés par cette action ; un nouveau jeton sera nécessaire pour synchroniser.",
       [
         { text: "Annuler", style: "cancel" },
         { text: "Réinitialiser", style: "destructive", onPress: onReset },
@@ -41,8 +25,12 @@ export default function HomeScreen({ enrollment, schema, user, onReset, onLock, 
     );
   }
 
-  const tone = licenceTone(check ? check.licence : "active");
-  const counts = check ? check.counts : null;
+  const counts = (reference && reference.counts) || { categories: 0, articles: 0, tables: 0, users: 0 };
+  const lastPull = reference ? reference.lastPull : null;
+  // La licence affichée vient du CACHE LOCAL : elle reste lisible hors ligne
+  // (SYNC-6), même si le serveur est injoignable.
+  const tone = licenceTone(reference ? reference.licence : null);
+  const empty = counts.categories === 0 && counts.articles === 0;
 
   return (
     <View
@@ -73,11 +61,9 @@ export default function HomeScreen({ enrollment, schema, user, onReset, onLock, 
           >
             <Text style={styles.lockButtonText}>Verrouiller</Text>
           </Pressable>
-          <View style={[styles.pill, { backgroundColor: error ? colors.dangerSoft : tone.bg }]}>
-            <View style={[styles.dot, { backgroundColor: error ? colors.danger : tone.fg }]} />
-            <Text style={[styles.pillText, { color: error ? colors.danger : tone.fg }]}>
-              {error ? "Serveur injoignable" : tone.label}
-            </Text>
+          <View style={[styles.pill, { backgroundColor: tone.bg }]} testID="licence-pill">
+            <View style={[styles.dot, { backgroundColor: tone.fg }]} />
+            <Text style={[styles.pillText, { color: tone.fg }]}>{tone.label}</Text>
           </View>
         </View>
       </View>
@@ -111,38 +97,54 @@ export default function HomeScreen({ enrollment, schema, user, onReset, onLock, 
             </Text>
           </View>
 
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Synchronisation</Text>
-            {busy && (
+          <View style={styles.card} testID="local-cache-card">
+            <Text style={styles.cardTitle}>Carte locale</Text>
+            {syncBusy ? (
               <View style={styles.busyRow}>
                 <ActivityIndicator color={colors.primary} />
-                <Text style={styles.busyText}>Contact du serveur…</Text>
+                <Text style={styles.busyText}>Synchronisation avec le serveur…</Text>
               </View>
-            )}
-            {!busy && error && (
-              <View style={styles.errorBox}>
-                <Text style={styles.errorText}>{error}</Text>
-                <Text style={styles.errorHint}>
-                  La caisse reste utilisable hors ligne : le journal fiscal est local.
-                </Text>
-              </View>
-            )}
-            {!busy && !error && counts && (
+            ) : (
               <>
                 <Row label="Catégories" value={String(counts.categories)} />
                 <Row label="Articles" value={String(counts.articles)} />
-                <Row label="Matricules" value={String(counts.users)} />
                 <Row label="Tables" value={String(counts.tables)} />
+                <Row label="Matricules" value={String(counts.users)} />
               </>
             )}
+            <Row label="Dernière synchro" value={formatSyncDate(lastPull)} />
+
+            {!syncBusy && syncError && (
+              <View style={styles.errorBox} testID="sync-error">
+                <Text style={styles.errorText}>{syncError}</Text>
+                <Text style={styles.errorHint}>
+                  La caisse reste utilisable hors ligne avec la carte enregistrée.
+                </Text>
+              </View>
+            )}
+
+            {!syncBusy && !syncError && empty && (
+              <View style={styles.emptyBox} testID="cache-empty">
+                <Text style={styles.emptyTitle}>Carte vide sur cette tablette</Text>
+                <Text style={styles.emptyText}>
+                  Synchronisez dès que le serveur est joignable : la carte sera ensuite
+                  disponible sans réseau.
+                </Text>
+              </View>
+            )}
+
             <Pressable
-              onPress={runCheck}
-              disabled={busy}
-              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, busy && styles.buttonDisabled]}
-              testID="check-connection"
+              onPress={onSync}
+              disabled={syncBusy}
+              style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, syncBusy && styles.buttonDisabled]}
+              testID="sync-now"
             >
-              <Text style={styles.buttonText}>{busy ? "Vérification…" : "Vérifier la connexion"}</Text>
+              <Text style={styles.buttonText}>{syncBusy ? "Synchronisation…" : "Synchroniser"}</Text>
             </Pressable>
+            <Text style={styles.journalNote}>
+              Articles synchronisés en delta depuis la dernière heure serveur ; catégories,
+              tables et matricules en mise à jour complète. Les prix sont stockés en centimes.
+            </Text>
           </View>
         </View>
 
@@ -237,6 +239,16 @@ const styles = StyleSheet.create({
   },
   errorText: { fontSize: 13, color: "#9F1239", lineHeight: 19 },
   errorHint: { ...font.small, marginTop: space(1), lineHeight: 17 },
+  emptyBox: {
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: space(3),
+    marginVertical: space(2),
+  },
+  emptyTitle: { ...font.h3, fontSize: 14 },
+  emptyText: { ...font.small, marginTop: space(1), lineHeight: 17 },
   button: {
     marginTop: space(2),
     height: 46,

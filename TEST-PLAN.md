@@ -691,3 +691,37 @@ Batterie **rerun-safe** : poste dédié `POSTE-77`, jeton aléatoire à chaque r
 | TC-M3-DB-10 | — | `appendEntry` sans `uuidOp` | Refus explicite `STORAGE`, aucune écriture | PASS |
 
 **Exécution du 2026-11-18** : mobile **91/91 PASS** (`make test-mobile`, image mobile, `node:sqlite` inclus) ; web **106/106 PASS**. Total projet **197 PASS / 0 FAIL** ; `make smoke` PASS ; APK `0.7.0` (versionCode 5) vérifié.
+
+## 30. Données de référence locales — TC-M4 (PRD 4.2 / SYNC-3, implémenté le 2026-11-19)
+
+> La caisse doit pouvoir afficher la carte et prendre une commande **sans
+> réseau**. Le pull de référence alimente un cache SQLite local : catégories,
+> articles (prix en **centimes entiers**, TVA à une décimale), tables et
+> personnel. Contrat : catégories/tables/personnel = pull **complet** (un
+> identifiant absent est désactivé, jamais supprimé) ; articles = pull **delta**
+> (`since` = heure serveur du dernier pull réussi), un article absent du lot
+> reste actif, un article désactivé arrive avec `actif = false`.
+
+| ID | Précondition | Action | Attendu | Statut |
+| --- | --- | --- | --- | --- |
+| TC-M4-MONEY-01/02 | — | `toCents(12.5)`, `toCents("0.07")`, `toCents(10000)`, puis `NaN`, `Infinity`, `-1`, `10000.01`, `"abc"`, `null`, `""`, booléen | Conversion exacte ; valeurs absentes ou hors bornes **refusées** (un prix manquant ne devient jamais 0) | PASS |
+| TC-M4-MONEY-03/04 | — | `formatEuros` (1 234,56 €), `sumLines` multi-lignes ; quantité nulle et prix flottant | Affichage français sans `Intl` ; somme en centimes exacte ; entrées invalides refusées | PASS |
+| TC-M4-REF-01/02 | — | Catégorie valide, `actif: 0`, nom trop long, UUID invalide, position négative/décimale | Normalisation + troncature à 80 caractères ; motifs de rejet explicites | PASS |
+| TC-M4-REF-03/04 | — | Article valide (12,50 € → 1250), sans catégorie, prix négatif/hors plafond, TVA 101 ou 10,25, version `0`/`"3"`, date illisible | Accepté/normalisé ; sinon rejet motivé ; date illisible → `null` (aucune date inventée) | PASS |
+| TC-M4-REF-05 | — | Table valide, salle par défaut, 0/21/2,5 places, salle trop longue | Normalisée ou rejetée (`places`) | PASS |
+| TC-M4-REF-06/07 | — | Lot avec doublon d'id + ligne invalide ; entrée `null`/objet/chaîne | Doublon et ligne invalide rejetés, le reste passe ; aucun crash sur entrée non tableau | PASS |
+| TC-M4-REF-08/09/10 | — | `groupMenu` (catégories ordonnées, articles triés, inactifs masqués), catégorie inactive, carte vide | Seules les catégories/articles actifs sont servis ; orphelins en « Sans catégorie » ; vide → `[]` | PASS |
+| TC-M4-REF-11 | — | `formatSyncDate(null/invalide/date locale)` | « jamais », « date inconnue », « 18/11/2026 à 09:05 » | PASS |
+| TC-M4-REF-12 | — | SQL de référence | UPSERT catégories/articles/tables, désactivation des absents ; **aucun** SQL de désactivation des articles | PASS |
+| TC-M4-DB-01 | SQLite neuve | Migrations 1→4 | Tables `categories`, `articles`, `tables_resto` ; `user_version = 4` ; prix flottant ou > 1 000 000 refusé, places 0 refusée | PASS |
+| TC-M4-DB-02 | SQLite neuve | Premier pull (2 catégories, 2 articles, 2 tables) | 6 lignes écrites, compteurs `{2,2,2,0}`, prix stocké 1250 centimes | PASS |
+| TC-M4-DB-03 | Carte en cache | Deuxième pull sans CAT_B ni T2 | Catégorie et table **désactivées**, lignes conservées, compteurs recalculés, `readTables` ne sert que les actives | PASS |
+| TC-M4-DB-04 | Carte en cache | Delta ne contenant qu'ART_B (nouveau prix) | ART_A **reste actif** (jamais désactivé par un delta) ; prix ART_B = 1390, version 2, `synced_at` renseigné | PASS |
+| TC-M4-DB-05 | Carte en cache | Delta avec `actif: false` explicite | Article désactivé localement, compteur d'articles actifs décrémenté | PASS |
+| TC-M4-DB-06 | — | Lot mixte (UUID invalide, prix négatif, TVA 33,33, 99 places) | Seules les lignes valides sont écrites ; rejets motivés par lot | PASS |
+| TC-M4-DB-07 | — | `readMenu` après pull avec catégorie active, article inactif et catégorie inactive | Carte groupée sans les inactifs, prix en centimes, TVA conservée | PASS |
+| TC-M4-DB-08 | — | `getLastPull`/`setLastPull` (2 fois), `setLicence`/`readLicence` | Valeur initiale `null`, heure serveur conservée, une seule ligne de réglage par clé, licence `grace1` relue | PASS |
+| TC-M4-DB-09 | — | Personnel actif en cache | Compteur `users` de l'accueil = 2 | PASS |
+| TC-M4-SYNC-10 | Serveur local | `POST /api/sync/pull` avec le jeton démo | Catégories avec `actif: true` explicite, 144 articles, 8 tables, licence `active`, `serverTime` présent | PASS |
+
+**Exécution du 2026-11-19** : mobile **116/116 PASS** (`make test-mobile`, image mobile) ; web **106/106 PASS**. Total projet **222 PASS / 0 FAIL** ; `make smoke` PASS ; APK `0.8.0` (versionCode 6) vérifié.

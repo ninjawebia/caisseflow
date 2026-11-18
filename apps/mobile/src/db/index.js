@@ -3,6 +3,7 @@
 import * as SQLite from "expo-sqlite";
 import { planMigrations, latestVersion } from "../core/migrations";
 import { CaisseError, CODES } from "../core/errors";
+import { getSetting, setSetting } from "./settings";
 
 const DB_NAME = "caisseflow.db";
 
@@ -42,17 +43,8 @@ export async function openAndMigrate() {
   };
 }
 
-export async function getSetting(db, key) {
-  const row = await db.getFirstAsync("SELECT value FROM settings WHERE key = ?", [key]);
-  return row ? row.value : null;
-}
-
-export async function setSetting(db, key, value) {
-  await db.runAsync(
-    `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
-    [key, value === null || value === undefined ? null : String(value)]
-  );
-}
+// Les réglages vivent dans un module CommonJS sans natif (`./settings`) pour
+// être testables sous Node ; on les ré-exporte ici pour les appelants de l'app.
+export { getSetting, setSetting };
 
 export { DB_NAME };

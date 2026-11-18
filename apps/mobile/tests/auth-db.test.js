@@ -45,7 +45,7 @@ test("migration 3 : tables du personnel et de l'authentification", async () => {
   const db = await freshDb();
   const tables = (await db.getAllAsync("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")).map((r) => r.name);
   for (const t of ["auth_events", "auth_state", "journal", "settings", "staff"]) assert.ok(tables.includes(t), t);
-  assert.equal((await db.getFirstAsync("PRAGMA user_version")).user_version, 3);
+  assert.equal((await db.getFirstAsync("PRAGMA user_version")).user_version, latestVersion());
   const cols = (await db.getAllAsync("PRAGMA table_info(staff)")).map((c) => c.name);
   assert.deepEqual(cols, ["matricule", "nom", "role", "pin_hash", "actif", "version", "synced_at"]);
 });

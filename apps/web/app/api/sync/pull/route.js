@@ -21,7 +21,11 @@ export async function POST(req) {
   const sinceDate = since ? new Date(since) : new Date(0);
 
   const cats = await pool.query(
-    `SELECT id, nom, position FROM categories WHERE restaurant_id=$1 AND actif = true ORDER BY position`,
+    // `actif` est transmis explicitement, mais le pull ne contient que les
+    // catégories ACTIVES : une catégorie archivée disparaît du lot, et la
+    // caisse la désactive localement (pull complet, jamais de suppression).
+    `SELECT id, nom, position, actif FROM categories
+     WHERE restaurant_id=$1 AND actif = true ORDER BY position`,
     [device.restaurantId]
   );
   const arts = await pool.query(

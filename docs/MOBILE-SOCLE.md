@@ -28,27 +28,32 @@ apps/mobile/
 │   │   ├── version.js          comparaison sémantique (minAppVersion, SEC-2)
 │   │   ├── errors.js           codes d'erreur stables + messages utilisateur
 │   │   ├── http.js             POST JSON + délai (AbortController), injectable
-│   │   ├── enrollment.js       enrôlement + contrôle de connexion
-│   │   └── migrations.js       inventaire SQL + planificateur (pur)
+│   │   ├── enrollment.js       enrôlement, pull de référence, contrôle de connexion
+│   │   ├── migrations.js       inventaire SQL + planificateur (pur)
 │   │   ├── sha256.js           SHA-256 JS pur (Hermes n'a pas `crypto`)
 │   │   ├── hash.js             payload canonique, chaînage, vérification
 │   │   ├── journal.js          écritures fiscales, réf. POSTE-XX-…, horloge
 │   │   ├── auth.js             politique PIN : 4–6, 5 échecs, 3 min, 30 s
 │   │   ├── staff.js            validation du personnel reçu par le pull
+│   │   ├── money.js            montants en CENTIMES entiers, format français
+│   │   ├── reference.js        validation du pull + carte groupée + date de synchro
 │   │   └── uuid.js             UUID v4 à partir d'octets aléatoires injectés
 │   ├── db/index.js             ouverture SQLite, WAL, application des migrations
+│   ├── db/settings.js          réglages clé/valeur (dernier pull, licence)
 │   ├── db/journal-sql.js       SQL du journal (texte + mapping purs, testables)
 │   ├── db/journal.js           écriture append-only, garde d'horloge, vérification
 │   ├── db/staff-sql.js         SQL personnel + état d'auth + journal des connexions
 │   ├── db/auth.js              bcrypt local, échecs/blocage, événements de session
+│   ├── db/reference-sql.js     SQL de la carte (UPSERT, désactivation des absents)
+│   ├── db/reference.js         sauvegarde transactionnelle, compteurs, menu, tables
 │   ├── native/random.js        aléa natif (expo-crypto) injecté dans les modules
 │   ├── shims/crypto.js         substitut `crypto` pour bcryptjs (vérification seule)
 │   ├── storage/device.js       jeton + adresse dans SecureStore (Keystore)
-│   ├── screens/                BootScreen, EnrollmentScreen, HomeScreen
+│   ├── screens/                BootScreen, EnrollmentScreen, LoginScreen, HomeScreen
 │   └── ui/theme.js             jetons de design (slate/bleu, mode clair)
 ├── metro.config.js             mapping `crypto` → src/shims/crypto.js (bcryptjs)
-└── tests/*.test.js             node:test — 91 tests, image mobile
-                                (dont 21 sur une vraie base SQLite via node:sqlite)
+└── tests/*.test.js             node:test — 116 tests, image mobile
+                                (dont 30 sur une vraie base SQLite via node:sqlite)
 ```
 
 Règle de conception : **toute la logique décidable vit dans `src/core/`** (pure),
@@ -78,19 +83,21 @@ explicitement** plutôt que rétrogradée.
 
 M1 = migration 1 (`settings`). M2 = migration 2 (`journal` + triggers
 append-only + trigger de séquence continue). M3 = migration 3 (`staff`,
-`auth_state`, `auth_events`). M4 ajoutera les tables de référence (menu, tables).
+`auth_state`, `auth_events`). M4 = migration 4 (`categories`, `articles`,
+`tables_resto`).
 
 ## 5. Tests et build
 
 ```bash
 make test-mobile     # node --test dans l'image mobile (aucun node sur l'hôte)
-make test            # web (106 tests) + mobile (91 tests)
+make test            # web (106 tests) + mobile (116 tests)
 make build-apk       # APK → output/apk/ (voir docs/BUILD-APK.md)
 ```
 
-L'APK `0.5.0` (versionCode 3) prouve l'intégration native : `libexpo-sqlite.so`
-est présent dans les quatre ABI et le bundle contient le schéma `settings` et
-l'appel `/api/sync/pull`.
+L'APK `0.8.0` (versionCode 6) prouve l'intégration native : `libexpo-sqlite.so`
+est présent dans les quatre ABI et le bundle contient les schémas du journal et
+de la carte locale (`prix_ttc_cents`, `tables_resto`), l'appel `/api/sync/pull`
+et bcryptjs.
 
 ## 6. Authentification locale (M3)
 
@@ -112,7 +119,28 @@ l'appel `/api/sync/pull`.
 - **Personnel** : cache local alimenté par le pull (dernière version gagnante).
   Un matricule absent du pull est **désactivé**, jamais supprimé.
 
-## 7. Décision technique : expo-sqlite (pas WatermelonDB)
+## 7. Données de référence locales (M4)
+
+- **Contrat** : articles en **delta** (`?since=` = heure SERVEUR du dernier pull
+  réussi, stockée dans `last.pull.at` — jamais l'heure locale, qui peut être
+  fausse) ; catégories, tables et personnel en pull **complet**.
+- **Désactivation des absents** : un identifiant absent d'un pull complet est
+  désactivé (`actif = 0`), **jamais supprimé** — une commande passée peut y
+  faire référence. Pour les articles (delta), un absent n'est **pas** touché ;
+  une désactivation est transmise explicitement.
+- **Transaction unique** : toute la carte est écrite dans une transaction, une
+  carte à moitié mise à jour serait pire que l'ancienne.
+- **Montants en centimes** : `prix_ttc_cents` est un entier (CHECK SQLite) et
+  `core/money.js` refuse une valeur absente — un prix manquant ne devient jamais
+  un article gratuit. L'affichage (`formatEuros`) n'utilise pas `Intl`.
+- **Validation stricte** : UUID, nom tronqué à 80, prix 0..10 000 €, TVA à une
+  décimale, places 1..20, version numérique ; une ligne douteuse est rejetée et
+  comptée sans interrompre le lot.
+- **Hors ligne** : la carte et la licence sont lues depuis SQLite à l'accueil ;
+  la synchronisation du démarrage est silencieuse et son échec ne bloque rien.
+  L'enrôlement persiste la carte téléchargée sans second appel réseau.
+
+## 8. Décision technique : expo-sqlite (pas WatermelonDB)
 
 Le PRD mentionne WatermelonDB en hypothèse (`[ASSUMPTION]`, décision laissée à
 l'agent). **expo-sqlite est retenu** parce que :
@@ -126,7 +154,7 @@ l'agent). **expo-sqlite est retenu** parce que :
 3. moins de dépendances natives à lier dans l'APK, base SQLite standard donc
    **extractible et auditable** (exigence fiscale).
 
-## 8. Limites assumées (M1–M3)
+## 9. Limites assumées (M1–M4)
 
 - Navigation minimaliste (2 écrans, machine à états) : la pile d'écrans POS
   arrive avec M5, quand les écrans de commande existent.
@@ -137,6 +165,9 @@ l'agent). **expo-sqlite est retenu** parce que :
   changement de PIN se fait depuis le back-office. Le substitut `crypto`
   (`src/shims/crypto.js`) échoue explicitement si une génération était tentée.
 - Pas de biométrie ni de QR d'enrôlement : candidats backlog, non implémentés.
+- Les photos d'articles ne sont pas téléchargées (seul `photo_hash` est
+  conservé) ; les variantes/suppléments et la gestion des salles côté caisse
+  restent hors périmètre M4 (candidats backlog).
 - Le jeton est saisi manuellement (pas de QR code) : une tablette par poste,
   installation < 10 min (PRD 4.1.10). Un enrôlement par QR est un candidat
   backlog, non implémenté.

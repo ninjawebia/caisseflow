@@ -106,6 +106,47 @@ const MIGRATIONS = [
       `CREATE INDEX IF NOT EXISTS idx_auth_events_ts ON auth_events(ts)`,
     ],
   },
+  {
+    version: 4,
+    name: "reference",
+    statements: [
+      // Données de RÉFÉRENCE (SYNC-3) : cache local, dernière version serveur
+      // gagnante. Aucun caractère fiscal : le journal reste la seule source de
+      // vérité des ventes.
+      `CREATE TABLE IF NOT EXISTS categories (
+         id TEXT PRIMARY KEY,
+         nom TEXT NOT NULL,
+         position INTEGER NOT NULL DEFAULT 0,
+         actif INTEGER NOT NULL DEFAULT 1,
+         synced_at TEXT NOT NULL DEFAULT (datetime('now'))
+       )`,
+      // Prix en CENTIMES (entier) : aucun flottant dans les montants. Un
+      // article peut arriver avant sa catégorie (pull delta) → pas de FK.
+      `CREATE TABLE IF NOT EXISTS articles (
+         id TEXT PRIMARY KEY,
+         categorie_id TEXT,
+         nom TEXT NOT NULL,
+         prix_ttc_cents INTEGER NOT NULL
+           CHECK (typeof(prix_ttc_cents) = 'integer' AND prix_ttc_cents BETWEEN 0 AND 1000000),
+         taux_tva REAL NOT NULL CHECK (taux_tva BETWEEN 0 AND 100),
+         actif INTEGER NOT NULL DEFAULT 1,
+         version INTEGER NOT NULL DEFAULT 1,
+         photo_hash TEXT,
+         updated_at TEXT,
+         synced_at TEXT NOT NULL DEFAULT (datetime('now'))
+       )`,
+      `CREATE INDEX IF NOT EXISTS idx_articles_categorie ON articles(categorie_id)`,
+      `CREATE TABLE IF NOT EXISTS tables_resto (
+         id TEXT PRIMARY KEY,
+         nom TEXT NOT NULL,
+         salle TEXT NOT NULL DEFAULT 'Salle 1',
+         places INTEGER NOT NULL
+           CHECK (typeof(places) = 'integer' AND places BETWEEN 1 AND 20),
+         actif INTEGER NOT NULL DEFAULT 1,
+         synced_at TEXT NOT NULL DEFAULT (datetime('now'))
+       )`,
+    ],
+  },
 ];
 
 function latestVersion() {

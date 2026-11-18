@@ -116,6 +116,14 @@ async function enroll({ serverUrl, token, appVersion, fetchImpl, timeoutMs }) {
       users: pulled.users.length,
       tables: pulled.tables.length,
     },
+    // La carte téléchargée à l'enrôlement est persistée telle quelle : la
+    // tablette doit pouvoir prendre une commande hors ligne dès la première
+    // connexion (aucun second appel réseau, M4).
+    reference: {
+      categories: pulled.categories,
+      articles: pulled.articles,
+      tables: pulled.tables,
+    },
     // Le personnel est persisté dès l'enrôlement : la connexion PIN doit
     // fonctionner hors ligne immédiatement après (M3).
     staff: pulled.users,
