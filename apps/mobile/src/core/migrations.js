@@ -69,6 +69,43 @@ const MIGRATIONS = [
       `CREATE INDEX IF NOT EXISTS idx_journal_ts ON journal(ts_local)`,
     ],
   },
+  {
+    version: 3,
+    name: "auth",
+    statements: [
+      // Personnel autorisé sur cette tablette (données de RÉFÉRENCE : dernière
+      // version serveur gagnante, pas de caractère fiscal). Le PIN ne circule
+      // que sous forme de hash bcrypt — la validation reste 100 % locale.
+      `CREATE TABLE IF NOT EXISTS staff (
+         matricule TEXT PRIMARY KEY,
+         nom TEXT NOT NULL,
+         role TEXT NOT NULL CHECK (role IN ('gerant','second','serveur','cuisine')),
+         pin_hash TEXT NOT NULL,
+         actif INTEGER NOT NULL DEFAULT 1,
+         version INTEGER NOT NULL DEFAULT 1,
+         synced_at TEXT NOT NULL DEFAULT (datetime('now'))
+       )`,
+      // Compteur d'échecs et verrouillage (5 échecs → blocage temporaire).
+      `CREATE TABLE IF NOT EXISTS auth_state (
+         matricule TEXT PRIMARY KEY,
+         failures INTEGER NOT NULL DEFAULT 0,
+         locked_until TEXT,
+         last_failure_at TEXT,
+         last_success_at TEXT
+       )`,
+      // Journal local des connexions (séparé du journal FISCAL : une connexion
+      // n'est pas un événement fiscal et ne doit pas polluer le chaînage).
+      `CREATE TABLE IF NOT EXISTS auth_events (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         ts TEXT NOT NULL,
+         matricule TEXT NOT NULL,
+         event TEXT NOT NULL CHECK (event IN
+           ('login_ok','login_fail','lockout','auto_lock','manual_lock','staff_sync')),
+         detail TEXT
+       )`,
+      `CREATE INDEX IF NOT EXISTS idx_auth_events_ts ON auth_events(ts)`,
+    ],
+  },
 ];
 
 function latestVersion() {

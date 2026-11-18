@@ -2,15 +2,18 @@
 // chaîne, écriture append-only, garde d'horloge et vérification complète.
 // Aucune fonction UPDATE/DELETE n'existe ici, et les triggers SQL les refusent
 // même en cas d'appel direct (FISC-1).
-import * as Crypto from "expo-crypto";
-import { buildEntry, guardTimestamp, verifyJournal, GENESIS_ANCHOR, checkClockSkew } from "../core/journal";
-import { uuidv4FromBytes } from "../core/uuid";
-import { CaisseError, CODES } from "../core/errors";
-import { INSERT_SQL, insertArgs, rowToEntry, SELECT_ALL_SQL, SELECT_HEAD_SQL } from "./journal-sql";
+"use strict";
+const { buildEntry, guardTimestamp, verifyJournal, GENESIS_ANCHOR, checkClockSkew } = require("../core/journal");
+const { CaisseError, CODES } = require("../core/errors");
+const { INSERT_SQL, insertArgs, rowToEntry, SELECT_ALL_SQL, SELECT_HEAD_SQL } = require("./journal-sql");
 
-function newUuid() {
-  // Aléa natif (Keystore / CSPRNG Android) ; la logique UUID reste pure.
-  return uuidv4FromBytes(Crypto.getRandomBytes(16));
+// L'aléa est INJECTÉ (`uuidOp` : fonction → UUID v4) : ce module n'importe
+// aucun natif, donc il est exécutable sous Node avec le même code qu'à bord.
+function requireUuidOp(options) {
+  if (!options || typeof options.uuidOp !== "function") {
+    throw new CaisseError(CODES.STORAGE, "Générateur d'identifiant d'opération manquant (uuidOp)");
+  }
+  return options.uuidOp;
 }
 
 async function head(db) {
@@ -18,7 +21,7 @@ async function head(db) {
   return row ? { seq: Number(row.seq), hashSelf: row.hash_self, tsLocal: row.ts_local } : null;
 }
 
-async function appendOne(db, { poste, type, user, validator, motif, data, now }) {
+async function appendOne(db, { poste, type, user, validator, motif, data, now, uuidOp }) {
   const last = await head(db);
   const seq = (last ? last.seq : 0) + 1;
   const hashPrev = last ? last.hashSelf : GENESIS_ANCHOR;
@@ -34,7 +37,7 @@ async function appendOne(db, { poste, type, user, validator, motif, data, now })
     validator,
     motif,
     data,
-    uuidOp: newUuid(),
+    uuidOp: uuidOp(),
   });
   await db.runAsync(INSERT_SQL, insertArgs(entry));
   return { entry, clock };
@@ -42,7 +45,8 @@ async function appendOne(db, { poste, type, user, validator, motif, data, now })
 
 // Écriture métier. Si l'horloge a reculé, l'incident HORLOGE est journalisé
 // AVANT l'écriture demandée (chronologie intacte, FISC-4).
-export async function appendEntry(db, options) {
+async function appendEntry(db, options) {
+  const uuidOp = requireUuidOp(options);
   const { poste, user, now } = options;
   const last = await head(db);
   const probe = guardTimestamp(last ? last.tsLocal : null, now || new Date());
@@ -57,19 +61,20 @@ export async function appendEntry(db, options) {
       motif: "Recul de l'horloge système détecté",
       data: { delta_ms: probe.deltaMs, derniere_ecriture: last.tsLocal },
       now,
+      uuidOp,
     });
     written.push(incident.entry);
     clock = incident.clock;
   }
 
-  const main = await appendOne(db, { ...options, now });
+  const main = await appendOne(db, { ...options, now, uuidOp });
   written.push(main.entry);
   return { entry: main.entry, entries: written, clock: { ...main.clock, recul: probe.recul, deltaMs: probe.deltaMs } };
 }
 
 // Écart horloge local ↔ serveur constaté au contact (FISC-4) : au-delà du
 // seuil, l'événement HORLOGE est journalisé (une fois par constat).
-export async function appendServerClockEvent(db, { poste, user, skewMs, thresholdMs }) {
+async function appendServerClockEvent(db, { poste, user, skewMs, thresholdMs, uuidOp }) {
   const skew = checkClockSkew(0, skewMs, thresholdMs);
   if (!skew.exceeds) return null;
   const res = await appendOne(db, {
@@ -78,12 +83,13 @@ export async function appendServerClockEvent(db, { poste, user, skewMs, threshol
     user,
     motif: skew.direction === "retard" ? "Horloge locale en retard sur le serveur" : "Horloge locale en avance sur le serveur",
     data: { ecart_ms: skew.skewMs, seuil_ms: skew.thresholdMs },
+    uuidOp,
   });
   return res.entry;
 }
 
 // Vérification complète au démarrage / à la clôture (FISC-7).
-export async function readJournalStatus(db) {
+async function readJournalStatus(db) {
   const rows = await db.getAllAsync(SELECT_ALL_SQL);
   const entries = rows.map(rowToEntry);
   const chain = verifyJournal(entries);
@@ -98,7 +104,7 @@ export async function readJournalStatus(db) {
 
 // Vérification bloquante du démarrage : une rupture interdit le service
 // d'encaissement (aucune correction automatique possible par conception).
-export async function assertChainIntact(db) {
+async function assertChainIntact(db) {
   const status = await readJournalStatus(db);
   if (!status.chain.ok) {
     throw new CaisseError(
@@ -110,4 +116,10 @@ export async function assertChainIntact(db) {
   return status;
 }
 
-export { checkClockSkew };
+module.exports = {
+  appendEntry,
+  appendServerClockEvent,
+  readJournalStatus,
+  assertChainIntact,
+  checkClockSkew,
+};

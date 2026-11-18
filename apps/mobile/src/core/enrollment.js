@@ -1,8 +1,8 @@
 "use strict";
-// Enrôlement d'une tablette (M1) : jeton + adresse serveur → validation réelle
-// par un pull de référence, puis persistance sécurisée côté appelant.
-// Le serveur ne renvoie le jeton qu'UNE fois (POST /api/devices) : la tablette
-// le prouve en appelant /api/sync/pull (Bearer) — un jeton révoqué répond 401.
+// Enrôlement d'une tablette (M1) + pull de référence (M3/M4) : jeton + adresse
+// serveur → validation réelle par un pull, puis persistance sécurisée côté
+// appelant. Le serveur ne renvoie le jeton qu'UNE fois (POST /api/devices) : la
+// tablette le prouve en appelant /api/sync/pull (Bearer) — révoqué ⇒ 401.
 
 const { CaisseError, CODES } = require("./errors");
 const { normalizeServerUrl, apiUrl } = require("./config");
@@ -39,23 +39,21 @@ function assertLicenceAllowsPull(status, data) {
   }
 }
 
-// Enrôlement : valide l'adresse + le jeton, puis prouve le jeton par un pull.
-async function enroll({ serverUrl, token, appVersion, fetchImpl, timeoutMs }) {
+// Pull de référence brut (menu, TVA, personnel, tables) — contrat SYNC-3.
+// `since` (ISO) permet le delta sur les articles (M4).
+async function pullReference({ serverUrl, token, since, fetchImpl, timeoutMs }) {
   let base;
   try {
     base = normalizeServerUrl(serverUrl);
   } catch (e) {
     throw new CaisseError(CODES.SERVER, e.message);
   }
-
   const clean = normalizeToken(token);
-  if (!clean) throw new CaisseError(CODES.TOKEN, "Jeton d'enrôlement obligatoire");
-  if (!isValidDeviceToken(clean)) {
-    throw new CaisseError(CODES.TOKEN, "Jeton invalide — 43 caractères attendus (copiez-le depuis l'écran « Appareils »)");
-  }
+  if (!isValidDeviceToken(clean)) throw new CaisseError(CODES.TOKEN, "Jeton d'appareil invalide");
 
+  const suffix = since ? `?since=${encodeURIComponent(since)}` : "";
   const { status, ok, data } = await postJson({
-    url: apiUrl(base, "/api/sync/pull"),
+    url: apiUrl(base, `/api/sync/pull${suffix}`),
     body: {},
     headers: { Authorization: `Bearer ${clean}` },
     fetchImpl,
@@ -66,52 +64,78 @@ async function enroll({ serverUrl, token, appVersion, fetchImpl, timeoutMs }) {
     throw new CaisseError(CODES.TOKEN, "Jeton refusé — il a peut-être été révoqué (ré-enrôlez la tablette)", { status });
   }
   assertLicenceAllowsPull(status, data);
-  if (!ok) {
-    throw new CaisseError(CODES.SERVER, `Le serveur a refusé la demande (HTTP ${status})`, { status });
-  }
+  if (!ok) throw new CaisseError(CODES.SERVER, `Le serveur a refusé la demande (HTTP ${status})`, { status });
 
   const minAppVersion = (data && data.minAppVersion) || null;
+  const etat = (data && data.licence && data.licence.etat) || "active";
+
+  return {
+    serverUrl: base,
+    token: clean,
+    licence: etat,
+    licenceLabel: licenceLabel(etat),
+    minAppVersion,
+    serverTime: (data && data.serverTime) || null,
+    categories: (data && data.categories) || [],
+    articles: (data && data.articles) || [],
+    users: (data && data.users) || [],
+    tables: (data && data.tables) || [],
+  };
+}
+
+function assertAppVersion(appVersion, minAppVersion) {
   const currentVersion = appVersion || APP_VERSION_FALLBACK;
   if (minAppVersion && isBelowVersion(currentVersion, minAppVersion)) {
     throw new CaisseError(CODES.VERSION,
       `Mise à jour obligatoire : version ${minAppVersion} minimum (installée : ${currentVersion})`,
       { minAppVersion, appVersion: currentVersion });
   }
+}
+
+// Enrôlement : valide l'adresse + le jeton, puis prouve le jeton par un pull.
+async function enroll({ serverUrl, token, appVersion, fetchImpl, timeoutMs }) {
+  const clean = normalizeToken(token);
+  if (!clean) throw new CaisseError(CODES.TOKEN, "Jeton d'enrôlement obligatoire");
+  if (!isValidDeviceToken(clean)) {
+    throw new CaisseError(CODES.TOKEN, "Jeton invalide — 43 caractères attendus (copiez-le depuis l'écran « Appareils »)");
+  }
+
+  const pulled = await pullReference({ serverUrl, token: clean, fetchImpl, timeoutMs });
+  assertAppVersion(appVersion, pulled.minAppVersion);
 
   return {
-    serverUrl: base,
-    token: clean,
-    licence: (data && data.licence && data.licence.etat) || "active",
-    licenceLabel: licenceLabel((data && data.licence && data.licence.etat) || "active"),
-    minAppVersion,
-    counts: summarize(data),
+    serverUrl: pulled.serverUrl,
+    token: pulled.token,
+    licence: pulled.licence,
+    licenceLabel: pulled.licenceLabel,
+    minAppVersion: pulled.minAppVersion,
+    serverTime: pulled.serverTime,
+    counts: {
+      categories: pulled.categories.length,
+      articles: pulled.articles.length,
+      users: pulled.users.length,
+      tables: pulled.tables.length,
+    },
+    // Le personnel est persisté dès l'enrôlement : la connexion PIN doit
+    // fonctionner hors ligne immédiatement après (M3).
+    staff: pulled.users,
   };
 }
 
 // Contrôle de connexion d'une tablette déjà enrôlée (même contrat que le pull).
 async function checkConnection({ serverUrl, token, fetchImpl, timeoutMs }) {
-  let base;
-  try {
-    base = normalizeServerUrl(serverUrl);
-  } catch (e) {
-    throw new CaisseError(CODES.SERVER, e.message);
-  }
-  const clean = normalizeToken(token);
-  if (!isValidDeviceToken(clean)) throw new CaisseError(CODES.TOKEN, "Jeton d'appareil invalide");
-
-  const { status, ok, data } = await postJson({
-    url: apiUrl(base, "/api/sync/pull"),
-    body: {},
-    headers: { Authorization: `Bearer ${clean}` },
-    fetchImpl,
-    timeoutMs,
-  });
-  if (status === 401) throw new CaisseError(CODES.TOKEN, "Jeton révoqué — ré-enrôlez la tablette", { status });
-  assertLicenceAllowsPull(status, data);
-  if (!ok) throw new CaisseError(CODES.SERVER, `Le serveur a refusé la demande (HTTP ${status})`, { status });
-
-  const etat = (data && data.licence && data.licence.etat) || "active";
-  return { licence: etat, licenceLabel: licenceLabel(etat), counts: summarize(data) };
+  const pulled = await pullReference({ serverUrl, token, fetchImpl, timeoutMs });
+  return {
+    licence: pulled.licence,
+    licenceLabel: pulled.licenceLabel,
+    serverTime: pulled.serverTime,
+    counts: {
+      categories: pulled.categories.length,
+      articles: pulled.articles.length,
+      users: pulled.users.length,
+      tables: pulled.tables.length,
+    },
+  };
 }
 
-module.exports = { enroll, checkConnection, summarize, licenceLabel, APP_VERSION_FALLBACK };
+module.exports = { enroll, checkConnection, pullReference, summarize, licenceLabel, assertAppVersion, APP_VERSION_FALLBACK };

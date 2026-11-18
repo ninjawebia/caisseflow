@@ -160,3 +160,19 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | Limites assumées | aucune écriture métier branchée (M5/M6 avec utilisateur authentifié M3) ; scellé Z signé en M8 ; pas de chiffrement au repos (candidat backlog) |
 | Doc | `docs/JOURNAL-FISCAL.md` (garanties, schéma, payload, horloge, preuves) |
 | Commit | `dd7ffaa` (poussé) |
+
+## Module 22 — Authentification locale PIN (M3, 2026-11-18)
+
+| Élément | Résultat |
+| --- | --- |
+| Besoin | Aucune écriture métier ne peut être produite sans savoir QUI opère (FISC-3). M2 livrait le moteur du journal, mais la caisse n'avait ni connexion opérateur, ni cache du personnel, ni verrouillage de session. |
+| Livré | migration 3 (`staff` cache du personnel, `auth_state` compteur/verrouillage, `auth_events` journal local des connexions **séparé du journal fiscal**) ; `authenticate` (bcrypt local, hash factice anti-énumération, même coût pour un matricule inconnu) ; `saveStaff` (dernière version gagnante, désactivation des absents **jamais** de suppression) ; politique `auth.js` (PIN 4–6, 5 échecs → 5 min, session 3 min, arrière-plan 30 s) ; écran `LoginScreen` (chips du personnel, pavé numérique tactile, compte à rebours de blocage, état vide avec synchronisation) ; `HomeScreen` (opérateur courant + bouton **Verrouiller**) ; `App.js` (db en référence, phases boot → enroll → login → home, verrouillage inactivité/arrière-plan, journalisation `manual_lock`/`auto_lock`) |
+| Refactor | `src/db/journal.js` n'importe plus `expo-crypto` : l'identifiant d'opération est **injecté** (`uuidOp`), ce qui rend l'adaptateur testable sous Node ; les adaptateurs `db/journal.js` et `db/auth.js` sont en CommonJS pour être exécutés par `node --test` sans appareil |
+| Bug corrigé | `normalizeStaffRows` traitait `actif: 0` comme actif (seul `false` désactivait) → une ligne désactivée par le serveur serait restée utilisable. Détecté par TC-M3-STAFF-05, corrigé dans le code. |
+| Sécurité | PIN jamais transmis ni journalisé ; réponse identique (et coût bcrypt identique) pour un matricule inconnu ; vérification refusée pendant le blocage ; hash factice `$2b$10$…` ; aucune écriture fiscale de démonstration |
+| Build | bcryptjs (UMD) importe `crypto` de Node, absent de React Native **et** ignoré par le champ `browser` du paquet → `metro.config.js` mappe `crypto` vers un substitut local (`src/shims/crypto.js`) qui échoue explicitement si une génération de sel était tentée (la tablette ne fait que vérifier) |
+| Tests | mobile **91/91 PASS** (dont 13 sur une vraie base SQLite via `node:sqlite` pour M3) ; web **106/106 PASS** ; total **197 PASS / 0 FAIL** ; `make smoke` PASS |
+| APK | `output/apk/caisseflow-0.7.0-release.apk` — **versionName 0.7.0, versionCode 5** (`aapt2`), `libexpo-sqlite`/`libexpo-crypto`/`libexpo-secure-store` présents, bundle contenant `auth_events`, `staff_sync`, `Verrouiller`, `key-submit` et bcryptjs ; build 9 m 30 s |
+| Outillage | `make test-mobile` s'exécute désormais dans **l'image mobile** (bcryptjs installé) avec `src`, `tests` et `App.js` montés en lecture seule — toujours aucun `node`/`npm` sur l'hôte |
+| Écart PRD | aucun (PRD 4.1.1). La biométrie, le changement de PIN à bord et le QR d'enrôlement restent hors périmètre approuvé (candidats backlog, non implémentés) |
+| Commit | voir `git log --oneline --grep="module-M3"` |

@@ -658,3 +658,36 @@ Batterie **rerun-safe** : poste dédié `POSTE-77`, jeton aléatoire à chaque r
 | TC-CHAIN-008..010 | Deux postes (`POSTE-01`, `POSTE-02`) | Vérification séparée OK ; chaîne unique = fausse rupture ; rupture localisée par poste | PASS |
 | TC-CHAIN-011..013 | Journal vide ; canonicalisation ; formule du hash | OK ; identique au serveur | PASS |
 | TC-CHAIN-014/015 | GET `/journal` (gérant) | `200`, « Chaînage SHA-256 vérifié », aucun faux incident | PASS |
+
+## 29. Authentification locale de la caisse — TC-M3 (PRD 4.1.1, implémenté le 2026-11-18)
+
+> Connexion de l'opérateur sur la tablette : matricule + PIN 4 à 6 chiffres,
+> **vérification bcrypt 100 % locale** (le PIN ne quitte jamais l'appareil, il
+> n'est stocké que sous forme de hash reçu du back-office). Politique : 5 échecs
+> → blocage 5 minutes, session verrouillée après 3 min d'inactivité et au retour
+> d'arrière-plan au-delà de 30 s. Le journal des connexions (`auth_events`) est
+> **séparé du journal fiscal** (une connexion n'est pas un événement fiscal).
+
+| ID | Précondition | Action | Attendu | Statut |
+| --- | --- | --- | --- | --- |
+| TC-M3-AUTH-01 | — | PIN `1234`, `12345`, `123456` ; puis `123`, `1234567`, `12a4`, ` 1234`, `１２３４`, vide, `null`, nombre `1234` | Seules les chaînes de 4 à 6 chiffres acceptées | PASS |
+| TC-M3-AUTH-02 | — | Matricule `" mgr "`, `"s08"`, `"TROP-LONG-9"`, `"S 08"` | Normalisation majuscules ; formats invalides refusés | PASS |
+| TC-M3-AUTH-03/04 | — | État sans verrou / verrou actif / verrou expiré | Tentative autorisée ; refus avec temps restant ; compteur remis à zéro après expiration | PASS |
+| TC-M3-AUTH-05 | — | 5 échecs successifs | Compteur 1→5, essais restants 4→0, blocage posé à 5 min | PASS |
+| TC-M3-AUTH-06 | — | Succès | Compteur 0, verrou levé, horodatage de succès | PASS |
+| TC-M3-AUTH-07/08 | — | Inactivité 179 s / 180 s ; arrière-plan 29 s / 30 s | Seuils exacts : expiré à 3 min, verrouillé à 30 s | PASS |
+| TC-M3-STAFF-01..04 | — | Hash bcrypt réel, variantes invalides, doublon, nom court, rôle inconnu, matricule invalide | Lignes valides normalisées ; 6 motifs de rejet explicites ; lot non interrompu | PASS |
+| TC-M3-STAFF-05/06 | — | `actif: false` **et** `actif: 0` ; vue publique | Désactivation respectée (bug corrigé : `0` était traité comme actif) ; aucun hash dans la vue publique | PASS |
+| TC-M3-STAFF-07 | — | Mappings SQL | UPSERT personnel, désactivation des absents, état d'auth, journal local | PASS |
+| TC-M3-DB-01 | SQLite neuve | Migrations 1→3 | `staff`, `auth_state`, `auth_events` + journal ; `user_version = 3` | PASS |
+| TC-M3-DB-02 | SQLite neuve | `saveStaff` puis pull modifié (renommage, nouveau PIN, matricule absent) | Dernière version gagnante ; absent **désactivé**, jamais supprimé ; PIN en clair absent de la base | PASS |
+| TC-M3-DB-03 | Personnel en cache | PIN correct / PIN faux | Connexion acceptée sans hash dans le résultat ; échec compté (`remaining = 4`) | PASS |
+| TC-M3-DB-04 | Personnel en cache | 5 mauvais PIN puis bon PIN pendant le blocage puis après | Blocage 5 min ; refus **sans vérifier le PIN** pendant le blocage ; réouverture et compteur à zéro | PASS |
+| TC-M3-DB-05 | Personnel en cache | Matricule inconnu | Même coût bcrypt (hash factice), échec tracé, aucune ligne `staff` créée | PASS |
+| TC-M3-DB-06 | Compte désactivé | Bon PIN | Refusé | PASS |
+| TC-M3-DB-07 | — | Matricule/PIN mal formés | Refusés **avant** tout accès à la base (aucun état créé) | PASS |
+| TC-M3-DB-08 | — | `lockStatus` ; `recordLockEvent` manuel/auto | Blocage lisible avec temps restant ; deux événements horodatés dans `auth_events` | PASS |
+| TC-M3-DB-09 | SQLite neuve | `appendEntry` avec `uuidOp` injecté, puis horloge reculée de 2 min | Écritures 1..3, incident `HORLOGE` **avant** l'écriture, horodatage jamais reculé, chaîne vérifiée | PASS |
+| TC-M3-DB-10 | — | `appendEntry` sans `uuidOp` | Refus explicite `STORAGE`, aucune écriture | PASS |
+
+**Exécution du 2026-11-18** : mobile **91/91 PASS** (`make test-mobile`, image mobile, `node:sqlite` inclus) ; web **106/106 PASS**. Total projet **197 PASS / 0 FAIL** ; `make smoke` PASS ; APK `0.7.0` (versionCode 5) vérifié.

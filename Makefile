@@ -148,10 +148,15 @@ seed:
 test: license-devkey test-mobile
 	$(COMPOSE) exec web sh -c "cd /repo/apps/web && npm test"
 
-# Socle mobile (M1) — tests unitaires SANS module natif : image node légère,
-# sources montées en lecture seule (les node_modules de l'app ne sont pas requis).
+# Socle mobile — tests unitaires dans l'image mobile (bcryptjs y est installé).
+# Les sources, les tests et App.js sont montés en lecture seule : l'image reste
+# la seule à contenir les node_modules (aucun npm/node sur l'hôte).
 test-mobile:
-	docker run --rm -v "$$PWD/apps/mobile":/app -w /app node:22-alpine npm test
+	docker compose run --rm --no-deps \
+	  -v "$$PWD/apps/mobile/src":/repo/apps/mobile/src:ro \
+	  -v "$$PWD/apps/mobile/tests":/repo/apps/mobile/tests:ro \
+	  -v "$$PWD/apps/mobile/App.js":/repo/apps/mobile/App.js:ro \
+	  mobile sh -c 'cd /repo/apps/mobile && npm test'
 
 chain-check:
 	$(COMPOSE) exec postgres /scripts/test-nf525-chain.sh

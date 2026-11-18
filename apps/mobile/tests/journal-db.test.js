@@ -6,7 +6,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { DatabaseSync } = require("node:sqlite");
-const { MIGRATIONS } = require("../src/core/migrations");
+const { MIGRATIONS, latestVersion } = require("../src/core/migrations");
 const { buildEntry, GENESIS_ANCHOR, verifyJournal } = require("../src/core/journal");
 const { canonical } = require("../src/core/hash");
 const { INSERT_SQL, insertArgs, rowToEntry, SELECT_ALL_SQL } = require("../src/db/journal-sql");
@@ -40,12 +40,12 @@ function insert(db, entry) {
   db.prepare(INSERT_SQL).run(...insertArgs(entry));
 }
 
-test("migrations : les deux tables existent, user_version = 2", () => {
+test("migrations : tables attendues et user_version à jour", () => {
   const db = migrate();
   const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all().map((r) => r.name);
   assert.ok(tables.includes("settings"));
   assert.ok(tables.includes("journal"));
-  assert.equal(db.prepare("PRAGMA user_version").get().user_version, 2);
+  assert.equal(db.prepare("PRAGMA user_version").get().user_version, latestVersion());
   const triggers = db.prepare("SELECT name FROM sqlite_master WHERE type='trigger'").all().map((r) => r.name);
   for (const t of ["journal_seq_continue", "journal_no_update", "journal_no_delete"]) assert.ok(triggers.includes(t), t);
 });

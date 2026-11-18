@@ -3,12 +3,13 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { StatusBar } from "expo-status-bar";
 import { colors, font, licenceTone, radius, space } from "../ui/theme";
 import { maskToken } from "../core/token";
+import { roleLabel } from "../core/auth";
 import { checkConnection } from "../core/enrollment";
 
 // Accueil de la caisse (M1) — prouve le socle : enrôlement persistant, base
-// SQLite migrée, serveur joignable, état de licence. La prise de commande et
-// le journal fiscal arrivent dans les modules suivants (M2/M5).
-export default function HomeScreen({ enrollment, schema, onReset, appVersion }) {
+// SQLite migrée, serveur joignable, état de licence. M3 ajoute l'opérateur
+// connecté et le verrouillage de session. La prise de commande arrive en M5.
+export default function HomeScreen({ enrollment, schema, user, onReset, onLock, onActivity, appVersion }) {
   const [check, setCheck] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -44,18 +45,40 @@ export default function HomeScreen({ enrollment, schema, onReset, appVersion }) 
   const counts = check ? check.counts : null;
 
   return (
-    <View style={styles.root}>
+    <View
+      style={styles.root}
+      onStartShouldSetResponder={() => {
+        // Tout contact tactile remet à zéro le minuteur d'inactivité.
+        if (onActivity) onActivity();
+        return false;
+      }}
+    >
       <StatusBar style="dark" />
       <View style={styles.topbar}>
         <View>
           <Text style={styles.brand}>CaisseFlow</Text>
           <Text style={styles.topbarSub}>Poste enrôlé · version {appVersion}</Text>
         </View>
-        <View style={[styles.pill, { backgroundColor: error ? colors.dangerSoft : tone.bg }]}>
-          <View style={[styles.dot, { backgroundColor: error ? colors.danger : tone.fg }]} />
-          <Text style={[styles.pillText, { color: error ? colors.danger : tone.fg }]}>
-            {error ? "Serveur injoignable" : tone.label}
-          </Text>
+        <View style={styles.topbarRight}>
+          {user && (
+            <View style={styles.userBox} testID="current-user">
+              <Text style={styles.userName} numberOfLines={1}>{user.nom}</Text>
+              <Text style={styles.userRole}>{roleLabel(user.role)} · {user.matricule}</Text>
+            </View>
+          )}
+          <Pressable
+            onPress={onLock}
+            style={({ pressed }) => [styles.lockButton, pressed && styles.lockButtonPressed]}
+            testID="lock-session"
+          >
+            <Text style={styles.lockButtonText}>Verrouiller</Text>
+          </Pressable>
+          <View style={[styles.pill, { backgroundColor: error ? colors.dangerSoft : tone.bg }]}>
+            <View style={[styles.dot, { backgroundColor: error ? colors.danger : tone.fg }]} />
+            <Text style={[styles.pillText, { color: error ? colors.danger : tone.fg }]}>
+              {error ? "Serveur injoignable" : tone.label}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -63,6 +86,7 @@ export default function HomeScreen({ enrollment, schema, onReset, appVersion }) 
         <View style={styles.grid}>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Cette tablette</Text>
+            <Row label="Opérateur" value={user ? `${user.nom} · ${user.matricule}` : "—"} />
             <Row label="Serveur" value={enrollment.serverUrl} mono />
             <Row label="Jeton d'appareil" value={maskToken(enrollment.token)} mono />
             <Row label="Base locale" value={`schéma v${schema.version}`} />
@@ -158,6 +182,22 @@ const styles = StyleSheet.create({
   },
   brand: { fontSize: 18, fontWeight: "800", color: colors.text, letterSpacing: -0.3 },
   topbarSub: { ...font.small, marginTop: 2 },
+  topbarRight: { flexDirection: "row", alignItems: "center", gap: space(3) },
+  userBox: { alignItems: "flex-end", maxWidth: 190 },
+  userName: { fontSize: 14, fontWeight: "700", color: colors.text },
+  userRole: { fontSize: 11, fontWeight: "600", color: colors.muted, textTransform: "uppercase", letterSpacing: 0.4, marginTop: 1 },
+  lockButton: {
+    height: 34,
+    paddingHorizontal: space(3),
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  lockButtonPressed: { backgroundColor: colors.primarySoft },
+  lockButtonText: { fontSize: 13, fontWeight: "700", color: colors.text },
   pill: {
     flexDirection: "row",
     alignItems: "center",
@@ -185,7 +225,8 @@ const styles = StyleSheet.create({
   rowValue: { ...font.body, flexShrink: 1, textAlign: "right" },
   rowMono: { fontFamily: "monospace", fontSize: 13 },
   busyRow: { flexDirection: "row", alignItems: "center", gap: space(2), paddingVertical: space(3) },
-  journalNote: { ...font.small, marginTop: space(3), lineHeight: 17 },  busyText: { ...font.body, color: colors.muted },
+  journalNote: { ...font.small, marginTop: space(3), lineHeight: 17 },
+  busyText: { ...font.body, color: colors.muted },
   errorBox: {
     backgroundColor: colors.dangerSoft,
     borderWidth: 1,

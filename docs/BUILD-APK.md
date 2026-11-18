@@ -98,6 +98,21 @@ Sortie : `output/apk/caisseflow-<version>-release.apk` (bind-mount hôte, UID 10
 - **Résolution** : wrapper `fetchR` (1 ré-essai sur 5xx) dans les batteries de
   test + warm-up avant les compteurs.
 
+### 4.6 `Unable to resolve module crypto from …/bcryptjs/umd/index.js` (v0.7.0)
+
+- **Symptôme** : le bundle Android échoue (`createBundleReleaseJsAndAssets`)
+  dès que l'authentification PIN (bcryptjs) entre dans l'app.
+- **Cause** : bcryptjs 3.x est publié en UMD et `require("crypto")` (module Node).
+  Le paquet déclare `browser: { "crypto": false }`, mais Metro ne l'applique pas
+  pour la plateforme `android`.
+- **Résolution** : `apps/mobile/metro.config.js` mappe `crypto` vers
+  `src/shims/crypto.js` (substitut qui **échoue explicitement** si une
+  génération de sel était tentée). La tablette ne fait que vérifier des hashs
+  (`compareSync`) : le sel est généré par le back-office.
+- **Vérification** : `strings` du bundle contient le message de bcryptjs
+  (« Neither WebCryptoAPI nor a crypto module is available »), preuve que la
+  bibliothèque est bien embarquée.
+
 ## 5. Résumé en une phrase
 
 > Bump de version dans `app.json` **et** `package.json` → `docker compose build
@@ -111,3 +126,4 @@ Sortie : `output/apk/caisseflow-<version>-release.apk` (bind-mount hôte, UID 10
 | 0.4.0 | 2 | `4835d7a` | volume `android_sdk`, build-tools 34, image rebuildée, docs + SKILL-APK |
 | 0.5.0 | 3 | `df29261` | premier APK avec du code réel : socle SQLite (`expo-sqlite`) + Keystore (`expo-secure-store`), enrôlement tablette ; vérifié par `aapt2` et par inspection des libs natives et du bundle |
 | 0.6.0 | 4 | `dd7ffaa` | journal fiscal local : triggers append-only, chaînage SHA-256, garde d'horloge, vérification au démarrage ; `expo-crypto` ajouté (UUID + aléa) |
+| 0.7.0 | 5 | (M3) | authentification locale PIN (bcryptjs), cache du personnel, verrouillage de session ; `metro.config.js` mappe `crypto` (absent de RN) vers un substitut explicite |

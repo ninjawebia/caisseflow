@@ -14,7 +14,7 @@ test("inventaire cohérent et version courante", () => {
 test("base neuve : toutes les migrations", () => {
   const plan = planMigrations(0);
   assert.equal(plan.length, MIGRATIONS.length);
-  assert.deepEqual(plan.map((m) => m.version), [1, 2]);
+  assert.deepEqual(plan.map((m) => m.version), MIGRATIONS.map((m) => m.version));
 });
 
 test("base à jour : aucune migration", () => {

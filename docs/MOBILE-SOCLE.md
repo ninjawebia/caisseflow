@@ -1,9 +1,9 @@
 # Socle mobile de la caisse (M1)
 
 > Caisse tablette Android — Expo / React Native 0.76 (SDK 52), 100 % conteneurisé.
-> Ce document décrit la structure posée au module M1 et complétée par le journal
-> fiscal (M2, voir `docs/JOURNAL-FISCAL.md`) ; la prise de commande (M5) et
-> l'encaissement (M6) s'appuient dessus.
+> Ce document décrit la structure posée au module M1, complétée par le journal
+> fiscal (M2, voir `docs/JOURNAL-FISCAL.md`) et l'authentification locale (M3) ;
+> la prise de commande (M5) et l'encaissement (M6) s'appuient dessus.
 
 ## 1. Rôle
 
@@ -33,15 +33,22 @@ apps/mobile/
 │   │   ├── sha256.js           SHA-256 JS pur (Hermes n'a pas `crypto`)
 │   │   ├── hash.js             payload canonique, chaînage, vérification
 │   │   ├── journal.js          écritures fiscales, réf. POSTE-XX-…, horloge
+│   │   ├── auth.js             politique PIN : 4–6, 5 échecs, 3 min, 30 s
+│   │   ├── staff.js            validation du personnel reçu par le pull
 │   │   └── uuid.js             UUID v4 à partir d'octets aléatoires injectés
 │   ├── db/index.js             ouverture SQLite, WAL, application des migrations
 │   ├── db/journal-sql.js       SQL du journal (texte + mapping purs, testables)
 │   ├── db/journal.js           écriture append-only, garde d'horloge, vérification
+│   ├── db/staff-sql.js         SQL personnel + état d'auth + journal des connexions
+│   ├── db/auth.js              bcrypt local, échecs/blocage, événements de session
+│   ├── native/random.js        aléa natif (expo-crypto) injecté dans les modules
+│   ├── shims/crypto.js         substitut `crypto` pour bcryptjs (vérification seule)
 │   ├── storage/device.js       jeton + adresse dans SecureStore (Keystore)
 │   ├── screens/                BootScreen, EnrollmentScreen, HomeScreen
 │   └── ui/theme.js             jetons de design (slate/bleu, mode clair)
-└── tests/*.test.js             node:test — 60 tests, image node:22-alpine
-                                (dont 8 sur une vraie base SQLite via node:sqlite)
+├── metro.config.js             mapping `crypto` → src/shims/crypto.js (bcryptjs)
+└── tests/*.test.js             node:test — 91 tests, image mobile
+                                (dont 21 sur une vraie base SQLite via node:sqlite)
 ```
 
 Règle de conception : **toute la logique décidable vit dans `src/core/`** (pure),
@@ -70,14 +77,14 @@ appliqué). Une base écrite par une version plus récente de l'app est **refus�
 explicitement** plutôt que rétrogradée.
 
 M1 = migration 1 (`settings`). M2 = migration 2 (`journal` + triggers
-append-only + trigger de séquence continue). M4 ajoutera les tables de
-référence (menu, tables, matricules).
+append-only + trigger de séquence continue). M3 = migration 3 (`staff`,
+`auth_state`, `auth_events`). M4 ajoutera les tables de référence (menu, tables).
 
 ## 5. Tests et build
 
 ```bash
-make test-mobile     # node --test dans node:22-alpine (aucun node sur l'hôte)
-make test            # web (106 tests) + mobile (60 tests)
+make test-mobile     # node --test dans l'image mobile (aucun node sur l'hôte)
+make test            # web (106 tests) + mobile (91 tests)
 make build-apk       # APK → output/apk/ (voir docs/BUILD-APK.md)
 ```
 
@@ -85,7 +92,27 @@ L'APK `0.5.0` (versionCode 3) prouve l'intégration native : `libexpo-sqlite.so`
 est présent dans les quatre ABI et le bundle contient le schéma `settings` et
 l'appel `/api/sync/pull`.
 
-## 6. Décision technique : expo-sqlite (pas WatermelonDB)
+## 6. Authentification locale (M3)
+
+- **PIN 4 à 6 chiffres**, vérifié sur l'appareil avec **bcryptjs** (coût 10,
+  même format que le back-office). Le PIN ne quitte jamais la tablette et n'est
+  jamais journalisé : seul `pin_hash` arrive par le pull.
+- **Anti-énumération** : un matricule inconnu est vérifié contre un hash factice
+  de coût identique — le temps de réponse ne révèle pas l'existence du compte.
+- **5 échecs → blocage 5 minutes**, refus immédiat (sans vérification bcrypt)
+  pendant le blocage ; l'état est persisté (`auth_state`) donc il survit à un
+  redémarrage de l'app.
+- **Verrouillage de session** : 3 minutes d'inactivité (tout contact tactile
+  remet le minuteur à zéro) ou retour d'arrière-plan après 30 s. Le bouton
+  **Verrouiller** de l'accueil journalise `manual_lock`.
+- **Journal des connexions** : `auth_events` (`login_ok`, `login_fail`,
+  `lockout`, `manual_lock`, `auto_lock`, `staff_sync`) — **séparé** du journal
+  fiscal : une connexion n'est pas un événement fiscal et ne doit pas entrer
+  dans le chaînage.
+- **Personnel** : cache local alimenté par le pull (dernière version gagnante).
+  Un matricule absent du pull est **désactivé**, jamais supprimé.
+
+## 7. Décision technique : expo-sqlite (pas WatermelonDB)
 
 Le PRD mentionne WatermelonDB en hypothèse (`[ASSUMPTION]`, décision laissée à
 l'agent). **expo-sqlite est retenu** parce que :
@@ -99,13 +126,17 @@ l'agent). **expo-sqlite est retenu** parce que :
 3. moins de dépendances natives à lier dans l'APK, base SQLite standard donc
    **extractible et auditable** (exigence fiscale).
 
-## 7. Limites assumées (M1/M2)
+## 8. Limites assumées (M1–M3)
 
 - Navigation minimaliste (2 écrans, machine à états) : la pile d'écrans POS
   arrive avec M5, quand les écrans de commande existent.
 - Aucune écriture métier n'est encore branchée : le journal (M2) est un moteur
   vérifié, alimenté par les encaissements M5/M6 avec l'utilisateur authentifié
   de M3. Aucune écriture de démonstration n'est insérée dans un journal fiscal.
+- La tablette ne **génère** pas de hash bcrypt (seulement `compareSync`) : le
+  changement de PIN se fait depuis le back-office. Le substitut `crypto`
+  (`src/shims/crypto.js`) échoue explicitement si une génération était tentée.
+- Pas de biométrie ni de QR d'enrôlement : candidats backlog, non implémentés.
 - Le jeton est saisi manuellement (pas de QR code) : une tablette par poste,
   installation < 10 min (PRD 4.1.10). Un enrôlement par QR est un candidat
   backlog, non implémenté.

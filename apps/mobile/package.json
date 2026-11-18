@@ -1,6 +1,6 @@
 {
   "name": "@caisseflow/mobile",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "CaisseFlow — applications tablette caisse / terminaux / KDS (Expo React Native)",
   "main": "index.js",
@@ -11,6 +11,7 @@
     "build:apk": "./scripts/build-apk.sh"
   },
   "dependencies": {
+    "bcryptjs": "3.0.2",
     "expo": "~52.0.0",
     "expo-asset": "~11.0.1",
     "expo-crypto": "~14.0.2",
