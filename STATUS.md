@@ -131,4 +131,4 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | Tests | **TC-DEV 33/33 PASS** (`make test`, exit 0) — total projet **91/91 PASS** (29 backlog + 13 LIC + 16 MED/TKT + 33 DEV) ; `make smoke` PASS ; cycle arrêt web → purge volume `next_cache` → up → migrate → tests respecté |
 | UX | jeton affiché en encart ambre avec bouton **Copier**, avertissement « une seule fois », masquage manuel ; révocation en 2 temps (Confirmer/Annuler) ; états vide, occupé, erreur serveur ; table responsive |
 | Écart PRD | aucun (périmètre PRD ch. 4.1.10 / SYNC-4) |
-| Commit | voir `git log --oneline --grep="module-DEV"` |
+| Commit | `dc672c5` (poussé) |
