@@ -46,6 +46,9 @@ export async function POST(req) {
     users: staff.rows.map((u) => ({ matricule: u.matricule, nom: u.nom, role: u.role, pinHash: u.pin_hash, actif: u.actif, version: u.version })),
     tables: tables.rows,
     licence: { etat: lic.rows[0]?.etat || "active" },
+    // Heure serveur : la caisse compare son horloge locale (contrôle FISC-4,
+    // saut > 60 s → événement HORLOGE journalisé localement).
+    serverTime: new Date().toISOString(),
     minAppVersion: "0.1.0", // SEC-2: force update below this version
   });
 }

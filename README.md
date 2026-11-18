@@ -24,7 +24,7 @@ Vérification (depuis les conteneurs, pas depuis l'hôte) : `make smoke`
 
 ```
 apps/web        → back-office Next.js (BO + API) + lib NF525 (lib/fiscal.js, isolé)
-apps/mobile     → caisse Expo React Native (socle M1 : SQLite, Keystore, enrôlement ; build APK via Docker)
+apps/mobile     → caisse Expo React Native (socle M1 + journal fiscal M2 ; build APK via Docker)
 packages/shared → types NF525 + DTO API partagés (web ↔ mobile)
 infra/          → scripts d'exploitation, Caddy (HTTPS), backups, Dokploy, clés de licence
 ```
@@ -66,7 +66,7 @@ utilisé ; `prisma-studio` est remplacé par **Adminer**. Toute mutation des DTO
 | --- | --- |
 | `make up` / `make down` / `make logs` | Cycle de vie des conteneurs dev |
 | `make migrate` / `make seed` | Base (dans le conteneur web) |
-| `make test` | Tests web (91) + tests du socle mobile (34) |
+| `make test` | Tests web (106) + tests de la caisse mobile (60) |
 | `make test-mobile` | Socle mobile seul (`node --test`, image `node:22-alpine`) — architecture : `docs/MOBILE-SOCLE.md` |
 | `make chain-check` / `make healthcheck` | Chaînage NF525 + santé des services |
 | `make smoke` | Test de fumée complet |

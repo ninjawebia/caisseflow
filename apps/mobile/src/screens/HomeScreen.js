@@ -73,6 +73,21 @@ export default function HomeScreen({ enrollment, schema, onReset, appVersion }) 
           </View>
 
           <View style={styles.card}>
+            <Text style={styles.cardTitle}>Journal fiscal local</Text>
+            <Row label="Écritures" value={String(schema.journal.count)} />
+            <Row label="Dernière séquence" value={schema.journal.lastSeq ? `#${schema.journal.lastSeq}` : "aucune"} />
+            <Row label="Dernière empreinte" value={schema.journal.lastHashShort ? `${schema.journal.lastHashShort}…` : "—"} mono />
+            <Row
+              label="Chaînage SHA-256"
+              value={schema.journal.chain.ok ? "intact" : `RUPTURE seq ${schema.journal.chain.brokenSeq}`}
+            />
+            <Text style={styles.journalNote}>
+              Journal Permanent append-only : aucune écriture ne peut être modifiée ni
+              supprimée (triggers SQLite), chaînage vérifié à chaque démarrage.
+            </Text>
+          </View>
+
+          <View style={styles.card}>
             <Text style={styles.cardTitle}>Synchronisation</Text>
             {busy && (
               <View style={styles.busyRow}>
@@ -170,7 +185,7 @@ const styles = StyleSheet.create({
   rowValue: { ...font.body, flexShrink: 1, textAlign: "right" },
   rowMono: { fontFamily: "monospace", fontSize: 13 },
   busyRow: { flexDirection: "row", alignItems: "center", gap: space(2), paddingVertical: space(3) },
-  busyText: { ...font.body, color: colors.muted },
+  journalNote: { ...font.small, marginTop: space(3), lineHeight: 17 },  busyText: { ...font.body, color: colors.muted },
   errorBox: {
     backgroundColor: colors.dangerSoft,
     borderWidth: 1,

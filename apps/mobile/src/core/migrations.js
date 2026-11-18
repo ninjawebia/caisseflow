@@ -25,6 +25,50 @@ const MIGRATIONS = [
          ('last.pull.at', NULL)`,
     ],
   },
+  {
+    version: 2,
+    name: "journal",
+    statements: [
+      // Journal Permanent local : append-only par construction (FISC-1).
+      `CREATE TABLE IF NOT EXISTS journal (
+         seq INTEGER PRIMARY KEY,
+         uuid_op TEXT NOT NULL UNIQUE,
+         ref TEXT NOT NULL UNIQUE,
+         type TEXT NOT NULL CHECK (type IN
+           ('VENTE','PAIEMENT','TICKET','ANNULATION','REMISE','CHANGEMENT_PRIX',
+            'SESSION','HORLOGE','CLOTURE_Z','IMPRESSION')),
+         ts_local TEXT NOT NULL,
+         user_matricule TEXT NOT NULL CHECK (length(trim(user_matricule)) BETWEEN 1 AND 16),
+         user_nom TEXT NOT NULL CHECK (length(trim(user_nom)) BETWEEN 1 AND 60),
+         validator_matricule TEXT,
+         motif TEXT,
+         payload TEXT NOT NULL,
+         hash_prev TEXT NOT NULL CHECK (length(hash_prev) = 64 AND hash_prev NOT GLOB '*[^0-9a-f]*'),
+         hash_self TEXT NOT NULL CHECK (length(hash_self) = 64 AND hash_self NOT GLOB '*[^0-9a-f]*'),
+         created_at TEXT NOT NULL DEFAULT (datetime('now'))
+       )`,
+      // La séquence ne peut pas sauter ni reculer (numérotation continue).
+      `CREATE TRIGGER IF NOT EXISTS journal_seq_continue
+         BEFORE INSERT ON journal
+         WHEN NEW.seq != (SELECT COALESCE(MAX(seq), 0) + 1 FROM journal)
+       BEGIN
+         SELECT RAISE(ABORT, 'Journal Permanent : séquence non continue');
+       END`,
+      // Aucune modification, aucune suppression — même par SQL direct.
+      `CREATE TRIGGER IF NOT EXISTS journal_no_update
+         BEFORE UPDATE ON journal
+       BEGIN
+         SELECT RAISE(ABORT, 'Journal Permanent : UPDATE interdit (append-only)');
+       END`,
+      `CREATE TRIGGER IF NOT EXISTS journal_no_delete
+         BEFORE DELETE ON journal
+       BEGIN
+         SELECT RAISE(ABORT, 'Journal Permanent : DELETE interdit (append-only)');
+       END`,
+      `CREATE INDEX IF NOT EXISTS idx_journal_type ON journal(type)`,
+      `CREATE INDEX IF NOT EXISTS idx_journal_ts ON journal(ts_local)`,
+    ],
+  },
 ];
 
 function latestVersion() {

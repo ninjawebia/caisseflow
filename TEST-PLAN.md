@@ -606,3 +606,55 @@ Batterie **rerun-safe** : poste dédié `POSTE-77`, jeton aléatoire à chaque r
 | TC-M1-MIG-01..06 | — | Planificateur de migrations | Contiguïté, base neuve → v1, base à jour → 0, base plus récente → refus, versions invalides rejetées, migration 1 = `settings` seulement | PASS |
 
 **Exécution du 2026-11-18** : `npm test` dans `node:22-alpine` → **34/34 PASS** (5 fichiers). Total projet : **91 tests web + 34 tests mobiles = 125 PASS, 0 FAIL** ; `make smoke` PASS ; APK `0.5.0` construit et vérifié (`aapt2` + libs natives `libexpo-sqlite.so` par ABI + bundle contenant le schéma `settings`).
+
+## 27. Journal fiscal local — TC-M2 (PRD FISC-1/2/3/4/7, implémenté le 2026-11-18)
+
+> Moteur du Journal Permanent sur la tablette : schéma SQLite append-only
+> (triggers), chaînage SHA-256 au contrat exact du serveur, numérotation
+> `POSTE-XX-000001`, écritures non anonymes, garde d'horloge, vérification
+> complète au démarrage. Les tests SQL s'exécutent sur une **vraie base SQLite**
+> (`node:sqlite`, mémoire) : la preuve porte sur le comportement, pas sur le code.
+
+| ID | Précondition | Action | Attendu | Statut |
+| --- | --- | --- | --- | --- |
+| TC-M2-HASH-01..03 | — | SHA-256 JS pur vs `node:crypto` (ASCII, accents, emoji, 55/56/63/64/65 octets, 1000 octets) | Égalité octet pour octet | PASS |
+| TC-M2-HASH-04 | — | `canonical` imbriqué/unicode | Identique au serveur (clés triées, sans espace) | PASS |
+| TC-M2-HASH-05..07 | — | Chaînage, altérations payload/hash/`hash_prev`, ancre littérale « GENESIS » | Validé ; toute altération localisée (seq + motif) | PASS |
+| TC-M2-HASH-08 | — | Trou de séquence en mode strict | `seq_non_continue` | PASS |
+| TC-M2-JRN-01 | — | 10 types d'événements | Conformes au PRD et au CHECK SQL | PASS |
+| TC-M2-JRN-02 | — | Numérotation | `POSTE-01-000001`, `POSTE-12-000042`, 1 000 000 non tronqué ; poste/seq invalides refusés | PASS |
+| TC-M2-JRN-03 | — | Écriture complète | Payload auto-porteur, hash = `SHA-256(prev ‖ payload)` | PASS |
+| TC-M2-JRN-04 | — | Écriture anonyme (matricule/nom vide) | Refusée (FISC-3) | PASS |
+| TC-M2-JRN-05 | — | Type inconnu, hash court, date invalide, UUID invalide, données non objet | Refusés | PASS |
+| TC-M2-JRN-06 | — | `ANNULATION`/`REMISE`/`CHANGEMENT_PRIX` sans motif ou sans second | Refusés ; avec motif + validateur → acceptés | PASS |
+| TC-M2-JRN-07 | — | Garde monotone | Recul → horodatage gelé + incident ; égalité → +1 ms | PASS |
+| TC-M2-JRN-08 | — | Écart serveur 59 s / 61 s / négatif | Seuil 60 s, sens correct | PASS |
+| TC-M2-JRN-09 | — | Chaîne de 4 écritures réelles | Vérifiée, puis rupture détectée à la seq 3 | PASS |
+| TC-M2-JRN-10 | — | UUID v4 (bits version/variante) | Format valide, version 1 refusée | PASS |
+| TC-M2-DB-01 | SQLite neuve | Migrations 1+2 | Tables `settings` + `journal`, `user_version = 2`, 3 triggers | PASS |
+| TC-M2-DB-02 | SQLite neuve | 2 insertions + relecture | Payload stocké canonique, refs correctes, chaîne valide | PASS |
+| TC-M2-DB-03 | 1 écriture | `UPDATE` SQL direct (motif, hash) | **Refusé** par trigger, ligne inchangée | PASS |
+| TC-M2-DB-04 | 1 écriture | `DELETE` SQL direct | **Refusé** par trigger, ligne conservée | PASS |
+| TC-M2-DB-05 | 1 écriture | Insertion seq 3 / rejeu seq 1 | Refusés | PASS |
+| TC-M2-DB-06 | — | Type inconnu, hash non hex, nom/matricule vides | CHECK SQL refusé | PASS |
+| TC-M2-DB-07 | 1 écriture | Même `uuid_op` rejoué | UNIQUE refusé | PASS |
+| TC-M2-DB-08 | Base forgée hors app | Vérification complète | Rupture détectée (seq 2, `hash_prev_mismatch`) | PASS |
+| TC-CHAIN-01..15 | — | Ancre de genèse, chaînage par poste, page `/journal` | 15/15 PASS (voir § 28) | PASS |
+
+**Exécution du 2026-11-18** : mobile **60/60 PASS** (`make test-mobile`, `node:sqlite` inclus) ; web **106/106 PASS**. Total projet **166 PASS / 0 FAIL** ; `make smoke` PASS ; APK `0.6.0` (versionCode 4) vérifié (`aapt2`, `libexpo-sqlite`/`libexpo-crypto`, bundle contenant les triggers du journal).
+
+## 28. Régression chaînage du journal répliqué — TC-CHAIN (v0.6, 2026-11-18)
+
+> Défaut corrigé : `verifyChain` partait de la chaîne littérale `"GENESIS"`
+> alors que la graine et `POST /api/sync/push` utilisent `SHA-256("GENESIS")` —
+> la page `/journal` affichait donc une **fausse rupture à la séquence 1**.
+> Second défaut : plusieurs postes étaient chaînés en une seule chaîne alors que
+> chaque poste possède sa numérotation et sa chaîne.
+
+| ID | Action | Attendu | Statut |
+| --- | --- | --- | --- |
+| TC-CHAIN-001..003 | Ancre de genèse ; première écriture ; ancienne ancre littérale | Ancre = `SHA-256("GENESIS")` ; première écriture acceptée ; « GENESIS » = rupture | PASS |
+| TC-CHAIN-004..007 | Chaîne de 3 ; altération hash/payload/`hash_prev` | Valide puis rupture localisée | PASS |
+| TC-CHAIN-008..010 | Deux postes (`POSTE-01`, `POSTE-02`) | Vérification séparée OK ; chaîne unique = fausse rupture ; rupture localisée par poste | PASS |
+| TC-CHAIN-011..013 | Journal vide ; canonicalisation ; formule du hash | OK ; identique au serveur | PASS |
+| TC-CHAIN-014/015 | GET `/journal` (gérant) | `200`, « Chaînage SHA-256 vérifié », aucun faux incident | PASS |

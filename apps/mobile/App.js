@@ -11,6 +11,7 @@ import BootScreen from "./src/screens/BootScreen";
 import EnrollmentScreen from "./src/screens/EnrollmentScreen";
 import HomeScreen from "./src/screens/HomeScreen";
 import { openAndMigrate } from "./src/db";
+import { assertChainIntact } from "./src/db/journal";
 import { loadEnrollment, saveEnrollment, clearEnrollment } from "./src/storage/device";
 import { colors, font, radius, space } from "./src/ui/theme";
 
@@ -27,7 +28,10 @@ export default function App() {
     setBootError(null);
     try {
       const db = await openAndMigrate();
-      setSchema({ version: db.version, latest: db.latest, applied: db.applied });
+      // FISC-7 : contrôle de chaînage complet AVANT tout service d'encaissement.
+      // Une rupture bloque le démarrage (incident affiché, aucune correction).
+      const journal = await assertChainIntact(db);
+      setSchema({ version: db.version, latest: db.latest, applied: db.applied, journal });
       const saved = await loadEnrollment();
       if (saved) {
         setEnrollment(saved);

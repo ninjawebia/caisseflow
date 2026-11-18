@@ -2,7 +2,7 @@ import { pool } from "../../lib/db";
 import { pageContext, LoginRequired } from "../../lib/pages";
 import { Shell } from "../../components/Shell";
 import { Card, PageHeader, StatusPill, EmptyState } from "../../components/ui";
-import { verifyChain } from "../../lib/fiscal";
+import { verifyChainsByPoste } from "../../lib/fiscal";
 
 // S-07 — Replica journal, read-only (BO-6). Full SHA-256 chain verification on
 // every load (FISC-7): any broken link is displayed as a blocking incident.
@@ -16,14 +16,14 @@ export default async function JournalPage({ searchParams }) {
   const type = ["VENTE", "PAIEMENT", "TICKET", "ANNULATION", "REMISE", "CHANGEMENT_PRIX", "SESSION", "HORLOGE", "CLOTURE_Z", "IMPRESSION"].includes(sp.type) ? sp.type : null;
   const q = typeof sp.q === "string" ? sp.q.trim() : "";
 
-  // Full chain check (append-only replica). Read in ascending seq order.
+  // Full chain check, une chaîne indépendante PAR POSTE (numérotation POSTE-XX-…).
   const all = await pool.query(
-    `SELECT seq, hash_prev, hash_self, payload FROM journal_replica
+    `SELECT poste, seq, hash_prev, hash_self, payload FROM journal_replica
      WHERE restaurant_id=$1 ORDER BY poste, seq`,
     [user.restaurantId]
   );
-  const chain = verifyChain(all.rows.map((r) => ({
-    seq: r.seq, hashPrev: r.hash_prev, hashSelf: r.hash_self, payload: r.payload,
+  const chain = verifyChainsByPoste(all.rows.map((r) => ({
+    poste: r.poste, seq: r.seq, hashPrev: r.hash_prev, hashSelf: r.hash_self, payload: r.payload,
   })));
 
   const filters = [user.restaurantId];
@@ -46,12 +46,12 @@ export default async function JournalPage({ searchParams }) {
   return (
     <Shell user={user} active="/journal" licence={licence}>
       <PageHeader title="Journal répliqué" subtitle="Lecture seule — append-only, le serveur ne corrige jamais le journal (BO-6, SYNC-2)">
-        <StatusPill tone={chain.ok ? "success" : "danger"}>{chain.ok ? "Chaînage SHA-256 vérifié" : `Rupture à ${chain.brokenSeq}`}</StatusPill>
+        <StatusPill tone={chain.ok ? "success" : "danger"}>{chain.ok ? `Chaînage SHA-256 vérifié${chain.postes > 1 ? ` (${chain.postes} postes)` : ""}` : `Rupture ${chain.poste} · seq ${chain.brokenSeq}`}</StatusPill>
       </PageHeader>
 
       {!chain.ok && (
         <div className="mb-6 bg-rose-50 border border-rose-200 text-rose-700 text-sm p-4 rounded-xl">
-          <strong>Incident de chaînage détecté à la séquence {chain.brokenSeq}</strong> ({chain.reason}) —
+          <strong>Incident de chaînage détecté sur {chain.poste} à la séquence {chain.brokenSeq}</strong> ({chain.reason}) —
           investigation requise. Aucune correction automatique n'est possible par conception.
         </div>
       )}

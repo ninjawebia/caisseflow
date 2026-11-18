@@ -146,3 +146,17 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | Outillage | nouvelle cible `make test-mobile` (aucun `node`/`npm` sur l'hôte), chaînée dans `make test` ; `npm test` mobile ajouté au `package.json` |
 | Écart PRD | aucun (périmètre PRD ch. 4.1.10 / SYNC-4) — la pile d'écrans POS arrive avec M5 |
 | Commit | `df29261` (poussé) |
+
+## Module 21 — Journal fiscal local (M2, 2026-11-18)
+
+| Élément | Résultat |
+| --- | --- |
+| Besoin | Cœur NF525 : sans journal local inaltérable, la caisse n'est pas une caisse (FISC-1..4, FISC-7). M1 fournissait la base et l'identité, aucune écriture fiscale. |
+| Livré | migration 2 (table `journal` append-only + triggers `journal_seq_continue`, `journal_no_update`, `journal_no_delete` + CHECK type/hash/anonymat) ; SHA-256 **JS pur** (Hermes n'a pas `crypto`) ; `canonical`/`nextHash`/`verifyChain` au contrat exact du serveur ; `buildEntry` (payload auto-porteur, motif + second obligatoires pour annulation/remise/changement de prix) ; `entryRef` `POSTE-XX-000001` ; garde d'horloge monotone + incident `HORLOGE` ; contrôle d'écart serveur (seuil 60 s, `serverTime` ajouté au pull) ; `appendEntry` / `readJournalStatus` / `assertChainIntact` ; **vérification de chaînage au démarrage** (rupture ⇒ service refusé, FISC-7) ; carte « Journal fiscal local » sur l'accueil |
+| Correctif associé (web) | `verifyChain` partait de `"GENESIS"` au lieu de `SHA-256("GENESIS")` → **fausse rupture affichée sur `/journal`** ; et plusieurs postes étaient chaînés ensemble → nouvelle fonction `verifyChainsByPoste`, page `/journal` corrigée (rupture localisée par poste), régression `TC-CHAIN` 15/15 |
+| Tests | mobile **60/60 PASS** dont 8 tests sur une **vraie base SQLite** (`node:sqlite`) prouvant que `UPDATE`/`DELETE` sont refusés par les triggers, que la séquence ne saute pas et que la relecture détecte une base forgée ; web **106/106 PASS** (ajout TC-CHAIN 15) ; total **166 PASS / 0 FAIL** ; `make smoke` PASS |
+| APK | `output/apk/caisseflow-0.6.0-release.apk` — **versionName 0.6.0, versionCode 4** (`aapt2`), libs `libexpo-sqlite`/`libexpo-crypto` présentes, bundle contenant `journal_no_delete` et `Journal Permanent : DELETE interdit` ; build 6 m 44 s |
+| Décision tracée | SQLite via **expo-sqlite** (et non WatermelonDB, mentionné en hypothèse PRD 5/6.2) : accès SQL direct nécessaire pour les triggers append-only, le chaînage et la vérification complète, sans couche de synchronisation tierce (la file idempotente est celle de SYNC-1, implémentée en M7). Décision technique laissée à l'agent par le PRD. |
+| Limites assumées | aucune écriture métier branchée (M5/M6 avec utilisateur authentifié M3) ; scellé Z signé en M8 ; pas de chiffrement au repos (candidat backlog) |
+| Doc | `docs/JOURNAL-FISCAL.md` (garanties, schéma, payload, horloge, preuves) |
+| Commit | voir `git log --oneline --grep="module-M2"` |

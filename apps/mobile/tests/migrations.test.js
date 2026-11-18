@@ -14,7 +14,7 @@ test("inventaire cohérent et version courante", () => {
 test("base neuve : toutes les migrations", () => {
   const plan = planMigrations(0);
   assert.equal(plan.length, MIGRATIONS.length);
-  assert.deepEqual(plan.map((m) => m.version), [1]);
+  assert.deepEqual(plan.map((m) => m.version), [1, 2]);
 });
 
 test("base à jour : aucune migration", () => {
@@ -36,4 +36,14 @@ test("migration 1 : socle réglages (table settings)", () => {
   assert.match(sql, /CREATE TABLE IF NOT EXISTS settings/);
   assert.match(sql, /device\.poste/);
   assert.doesNotMatch(sql, /\bjournal\b/i, "le journal fiscal arrive en M2, pas en M1");
+});
+
+test("migration 2 : journal append-only (table + triggers + séquence continue)", () => {
+  const sql = MIGRATIONS[1].statements.join("\n");
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS journal/);
+  assert.match(sql, /BEFORE UPDATE ON journal/);
+  assert.match(sql, /BEFORE DELETE ON journal/);
+  assert.match(sql, /RAISE\(ABORT, 'Journal Permanent : séquence non continue'\)/);
+  assert.match(sql, /CHECK \(type IN/);
+  assert.match(sql, /hash_prev NOT GLOB '\*\[\^0-9a-f\]\*'/);
 });

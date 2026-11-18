@@ -2,14 +2,14 @@
   "expo": {
     "name": "CaisseFlow",
     "slug": "caisseflow",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "orientation": "landscape",
     "platforms": [
       "android"
     ],
     "android": {
       "package": "fr.caisseflow.app",
-      "versionCode": 3
+      "versionCode": 4
     },
     "plugins": []
   }
