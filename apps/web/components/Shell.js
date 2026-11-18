@@ -7,6 +7,7 @@ const NAV = [
   { href: "/menu", label: "Menu & TVA", perm: "menu" },
   { href: "/utilisateurs", label: "Utilisateurs", perm: "users" },
   { href: "/tables", label: "Tables & salles", perm: "tables" },
+  { href: "/appareils", label: "Appareils", perm: "devices" },
   { href: "/rapports", label: "Rapports", perm: "reports" },
   { href: "/journal", label: "Journal", perm: "journal" },
   { href: "/exports", label: "Exports", perm: "exports" },

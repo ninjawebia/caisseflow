@@ -540,3 +540,40 @@ Chaque cas porte : **ID**, **titre**, **module**, **exigence PRD liée**, **prio
 | TC-TKT-003 | Gérant | PATCH modèle puis rechargement | `200` ; l'aperçu reflète le logo et les mentions enregistrés | PASS |
 
 **Exécution du 2026-11-17** (dans le conteneur, `make test`) : **TC-TKT 3/3 PASS** — total avec TC-MED **16/16 PASS**.
+
+## 25. Enrôlement des tablettes — TC-DEV (caisse Phase 1, PRD ch. 4.1.10 / SYNC-4, implémenté le 2026-11-18)
+
+> Chaque tablette caisse reçoit un **jeton d'appareil** généré par le gérant
+> depuis `/appareils`. Le jeton (256 bits) est stocké **hashé** (SHA-256) et
+> n'est affiché **qu'une seule fois** ; il authentifie `POST /api/sync/pull` et
+> `POST /api/sync/push`. Un poste (`POSTE-01`…`POSTE-99`) ne peut avoir qu'un
+> jeton actif — il porte la numérotation fiscale continue. La révocation
+> (`actif=false`) coupe la synchronisation **immédiatement** (401) sans jamais
+> supprimer la ligne (traçabilité).
+
+| ID | Précondition | Action | Attendu | Statut |
+| --- | --- | --- | --- | --- |
+| TC-DEV-001 | Anonyme | GET /api/devices | `403` | PASS |
+| TC-DEV-002/003 | Comptable | GET / POST /api/devices | `403` (permission `devices` = gérant) | PASS |
+| TC-DEV-004 | Gérant | POST poste `POSTE-1`, `POSTE-100`, `CAISSE-01`, vide | `400` (format `POSTE-XX`) | PASS |
+| TC-DEV-005 | Gérant | POST `POSTE-77` | `201` + `token` | PASS |
+| TC-DEV-006 | Gérant | Format du jeton | base64url 43 caractères (256 bits) | PASS |
+| TC-DEV-007 | Gérant | Réponse de création | `device.poste = POSTE-77` | PASS |
+| TC-DEV-008..010 | Gérant | Lecture en base | `token_hash = SHA-256(jeton)`, `actif=true`, **aucune** trace du jeton en clair | PASS |
+| TC-DEV-011 | Gérant | Journal d'audit | ligne `device_create` (entity_id = id tablette) | PASS |
+| TC-DEV-012/013 | Gérant | GET /api/devices | `200`, poste listé, ni jeton ni hash divulgués | PASS |
+| TC-DEV-014/015 | Jeton valide | POST /api/sync/pull | `200` + catégories, articles, matricules | PASS |
+| TC-DEV-016 | Jeton valide | Contenu du pull | `pinHash` seulement, jamais `pin` | PASS |
+| TC-DEV-017 | Jeton valide | POST /api/sync/push (lot vide) | `200` (authentification appareil OK) | PASS |
+| TC-DEV-018/019 | Poste déjà actif | POST même poste | `409` + `device_id` de la tablette active | PASS |
+| TC-DEV-020 | Comptable | DELETE /api/devices/:id | `403` | PASS |
+| TC-DEV-021 | Gérant | DELETE /api/devices/:id | `200` | PASS |
+| TC-DEV-022/023 | Jeton révoqué | pull / push | `401` immédiat | PASS |
+| TC-DEV-024 | Gérant | DELETE une 2ᵉ fois | `404` | PASS |
+| TC-DEV-025 | Gérant | Lecture en base après révocation | ligne conservée (`actif=false`) | PASS |
+| TC-DEV-026 | Gérant | Journal d'audit | ligne `device_revoke` | PASS |
+| TC-DEV-027/028 | Gérant | GET /appareils (SSR) | `200`, formulaire d'enrôlement, nav « Appareils » | PASS |
+| TC-DEV-029/030 | Comptable | GET /appareils | `200` avec « Accès refusé (403) », entrée de nav absente | PASS |
+
+**Exécution du 2026-11-18** (dans le conteneur, `make test`) : **TC-DEV 33/33 PASS** — total projet **91/91 PASS** (29 backlog + 13 LIC + 16 MED/TKT + 33 DEV), `make smoke` PASS.
+Batterie **rerun-safe** : poste dédié `POSTE-77`, jeton aléatoire à chaque run, lignes créées par le run retirées en fin de passage (le journal d'audit, lui, reste — append-only).

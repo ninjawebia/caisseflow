@@ -119,3 +119,16 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | Infrastructure | nouveau volume nommé `android_sdk` (NDK r26b ~2,5 Go installé UNE fois, plus de re-téléchargement à chaque build) ; build-tools 34.0.0 ajouté au SDK (demandé par le template RN 0.76.9) ; image mobile rebuildée (app.json 0.4.0 + package.json 0.4.0 sont COPIÉS dans l'image — pas de montage source) |
 | Pièges documentés | le nom d'APK vient de `apps/mobile/package.json` (bumpé 0.1.0 → 0.4.0 en même temps que app.json) ; l'ancienne 1ʳᵉ erreur du build (« Could not get unknown property 'release' ») est COLLATÉRALE à l'échec d'installation du NDK ; `sdkmanager ndk;26.1.10909125` manuel ≈ 15-25 min (lent mais fiable) | 
 | Commit | `4835d7a` (poussé) |
+
+## Module 19 — Enrôlement des tablettes (M0 caisse Phase 1, 2026-11-18)
+
+| Élément | Résultat |
+| --- | --- |
+| Besoin | Le back-office savait créer des comptes web/mobiles mais **pas enrôler une tablette** : les jetons d'appareil n'existaient que par le seed (démo `POSTE-01`). Sans enrôlement, aucune caisse ne peut synchroniser en production (PRD 4.1.10, SYNC-1/4). |
+| Livré | page `/appareils` (gérant) + `POST /api/devices` (jeton 256 bits affiché **une fois**, stocké hashé SHA-256) + `GET /api/devices` (liste, jeton jamais relisible) + `DELETE /api/devices/:id` (révocation `actif=false`, jamais de suppression) + entrée de nav « Appareils » + permission RBAC `devices` (gérant uniquement) |
+| Règles | un seul jeton **actif** par poste `POSTE-01…POSTE-99` (`409` sinon, `device_id` retourné) ; révocation → `pull`/`push` répondent `401` immédiatement ; audit `device_create` / `device_revoke` ; le jeton n'est **jamais** renvoyé par la liste |
+| Fichiers | `app/api/devices/route.js`, `app/api/devices/[id]/route.js`, `app/appareils/page.js`, `components/DevicesClient.js`, `components/Shell.js`, `lib/auth.js`, `tests/device-features.js` |
+| Tests | **TC-DEV 33/33 PASS** (`make test`, exit 0) — total projet **91/91 PASS** (29 backlog + 13 LIC + 16 MED/TKT + 33 DEV) ; `make smoke` PASS ; cycle arrêt web → purge volume `next_cache` → up → migrate → tests respecté |
+| UX | jeton affiché en encart ambre avec bouton **Copier**, avertissement « une seule fois », masquage manuel ; révocation en 2 temps (Confirmer/Annuler) ; états vide, occupé, erreur serveur ; table responsive |
+| Écart PRD | aucun (périmètre PRD ch. 4.1.10 / SYNC-4) |
+| Commit | voir `git log --oneline --grep="module-DEV"` |
