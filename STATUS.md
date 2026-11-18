@@ -175,4 +175,4 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | APK | `output/apk/caisseflow-0.7.0-release.apk` — **versionName 0.7.0, versionCode 5** (`aapt2`), `libexpo-sqlite`/`libexpo-crypto`/`libexpo-secure-store` présents, bundle contenant `auth_events`, `staff_sync`, `Verrouiller`, `key-submit` et bcryptjs ; build 9 m 30 s |
 | Outillage | `make test-mobile` s'exécute désormais dans **l'image mobile** (bcryptjs installé) avec `src`, `tests` et `App.js` montés en lecture seule — toujours aucun `node`/`npm` sur l'hôte |
 | Écart PRD | aucun (PRD 4.1.1). La biométrie, le changement de PIN à bord et le QR d'enrôlement restent hors périmètre approuvé (candidats backlog, non implémentés) |
-| Commit | voir `git log --oneline --grep="module-M3"` |
+| Commit | `a384984` (poussé) |

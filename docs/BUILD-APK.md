@@ -126,4 +126,4 @@ Sortie : `output/apk/caisseflow-<version>-release.apk` (bind-mount hôte, UID 10
 | 0.4.0 | 2 | `4835d7a` | volume `android_sdk`, build-tools 34, image rebuildée, docs + SKILL-APK |
 | 0.5.0 | 3 | `df29261` | premier APK avec du code réel : socle SQLite (`expo-sqlite`) + Keystore (`expo-secure-store`), enrôlement tablette ; vérifié par `aapt2` et par inspection des libs natives et du bundle |
 | 0.6.0 | 4 | `dd7ffaa` | journal fiscal local : triggers append-only, chaînage SHA-256, garde d'horloge, vérification au démarrage ; `expo-crypto` ajouté (UUID + aléa) |
-| 0.7.0 | 5 | (M3) | authentification locale PIN (bcryptjs), cache du personnel, verrouillage de session ; `metro.config.js` mappe `crypto` (absent de RN) vers un substitut explicite |
+| 0.7.0 | 5 | `a384984` | authentification locale PIN (bcryptjs), cache du personnel, verrouillage de session ; `metro.config.js` mappe `crypto` (absent de RN) vers un substitut explicite |
