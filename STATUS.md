@@ -159,4 +159,4 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | Décision tracée | SQLite via **expo-sqlite** (et non WatermelonDB, mentionné en hypothèse PRD 5/6.2) : accès SQL direct nécessaire pour les triggers append-only, le chaînage et la vérification complète, sans couche de synchronisation tierce (la file idempotente est celle de SYNC-1, implémentée en M7). Décision technique laissée à l'agent par le PRD. |
 | Limites assumées | aucune écriture métier branchée (M5/M6 avec utilisateur authentifié M3) ; scellé Z signé en M8 ; pas de chiffrement au repos (candidat backlog) |
 | Doc | `docs/JOURNAL-FISCAL.md` (garanties, schéma, payload, horloge, preuves) |
-| Commit | voir `git log --oneline --grep="module-M2"` |
+| Commit | `dd7ffaa` (poussé) |
