@@ -145,4 +145,4 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | APK | `output/apk/caisseflow-0.5.0-release.apk` — `fr.caisseflow.app` **versionName 0.5.0, versionCode 3**, minSdk 24 (vérifié `aapt2 dump badging`) ; libs natives `libexpo-sqlite.so` présentes (arm64-v8a, armeabi-v7a, x86, x86_64) ; bundle contient `CREATE TABLE ... settings` et `/api/sync/pull` (preuve d'intégration) ; build 6 m 49 s |
 | Outillage | nouvelle cible `make test-mobile` (aucun `node`/`npm` sur l'hôte), chaînée dans `make test` ; `npm test` mobile ajouté au `package.json` |
 | Écart PRD | aucun (périmètre PRD ch. 4.1.10 / SYNC-4) — la pile d'écrans POS arrive avec M5 |
-| Commit | voir `git log --oneline --grep="module-M1"` |
+| Commit | `df29261` (poussé) |
