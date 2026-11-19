@@ -113,6 +113,27 @@ Sortie : `output/apk/caisseflow-<version>-release.apk` (bind-mount hôte, UID 10
   (« Neither WebCryptoAPI nor a crypto module is available »), preuve que la
   bibliothèque est bien embarquée.
 
+### 4.7 « Serveur injoignable » alors que le back-office répond (v0.8.1)
+
+- **Symptôme** : à l'enrôlement, l'adresse `http://192.168.x.x:3000` est
+  acceptée (validation OK) mais le pull échoue immédiatement — « Serveur
+  injoignable — vérifiez l'adresse et le réseau du restaurant », alors que le
+  même serveur répond en HTTP 200 depuis un navigateur.
+- **Cause** : l'APK est compilé avec `targetSdk 34`. Depuis Android 9,
+  `android:usesCleartextTraffic` vaut `false` par défaut : une build **release**
+  refuse tout appel HTTP en clair. Le gabarit Expo ne pose cet attribut que sur
+  le manifeste de **debug** (vérifiable avec
+  `aapt2 dump xmltree --file AndroidManifest.xml`).
+- **Résolution** : plugin Expo local `plugins/withCleartextTraffic.js`
+  (`withAndroidManifest` → `android:usesCleartextTraffic="true"`), déclaré dans
+  `app.json` (`"plugins": ["./plugins/withCleartextTraffic"]`). Il s'exécute à
+  chaque `expo prebuild`, donc aucun fichier natif n'est maintenu à la main.
+- **Portée** : déploiement local du restaurant (PRD : back-office sur le réseau
+  du restaurant). En cas d'exposition Internet, passer le serveur en HTTPS et
+  retirer le plugin.
+- **Vérification** : `aapt2 dump xmltree` doit afficher
+  `usesCleartextTraffic(0x010104ec)=true` sur la balise `<application>`.
+
 ## 5. Résumé en une phrase
 
 > Bump de version dans `app.json` **et** `package.json` → `docker compose build
@@ -128,3 +149,4 @@ Sortie : `output/apk/caisseflow-<version>-release.apk` (bind-mount hôte, UID 10
 | 0.6.0 | 4 | `dd7ffaa` | journal fiscal local : triggers append-only, chaînage SHA-256, garde d'horloge, vérification au démarrage ; `expo-crypto` ajouté (UUID + aléa) |
 | 0.7.0 | 5 | `a384984` | authentification locale PIN (bcryptjs), cache du personnel, verrouillage de session ; `metro.config.js` mappe `crypto` (absent de RN) vers un substitut explicite |
 | 0.8.0 | 6 | `e7fe576` | données de référence locales : migration 4 (catégories, articles en centimes, tables), synchronisation delta des articles, carte locale hors ligne sur l'accueil |
+| 0.8.1 | 7 | (correctif) | HTTP en clair autorisé en release (`plugins/withCleartextTraffic.js`) : sans lui, l'APK ne peut pas joindre un back-office local en `http://` |

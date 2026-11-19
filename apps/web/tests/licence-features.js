@@ -34,6 +34,15 @@ async function main() {
   const jarC = await login("comptable@local.test", "Compta123!");
   const H = (cookie) => ({ "Content-Type": "application/json", Origin: B, Cookie: cookie });
 
+  // Jeton d'appareil DÉDIÉ (rerun-safe) : la licence sera volontairement
+  // expirée plus bas, et le jeton de démo peut être révoqué par un enrôlement
+  // réel. Le jeton de test est créé AVANT l'expiration, puis révoqué à la fin.
+  const dev = await fetch(`${B}/api/devices`, { method: "POST", headers: H(jar), body: JSON.stringify({ poste: "POSTE-79" }) });
+  const devBody = await dev.json().catch(() => ({}));
+  const deviceToken = devBody.token;
+  const deviceId = devBody.device && devBody.device.id;
+  if (!deviceToken) throw new Error(`création du jeton de test → HTTP ${dev.status}`);
+
   const rid = (await pool.query("SELECT restaurant_id FROM users_web WHERE email = 'gerant@local.test'")).rows[0].restaurant_id;
   const activate = (cle) => fetch(`${B}/api/licence/activate`, { method: "POST", headers: H(jar), body: JSON.stringify({ cle }) });
 
@@ -86,7 +95,7 @@ async function main() {
   check("TC-LIC-010-lecture-ok", r1.status === 200, `HTTP ${r1.status}`);
 
   // Sync tablette suspendu (licences expirée → pull 403)
-  const s1 = await fetch(`${B}/api/sync/pull`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer device-token-demo-POSTE-01" }, body: "{}" });
+  const s1 = await fetch(`${B}/api/sync/pull`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${deviceToken}` }, body: "{}" });
   check("TC-LIC-011-sync-suspendu", s1.status === 403, `HTTP ${s1.status}`);
 
   // Restauration (expires_at futur) → écritures à nouveau autorisées
@@ -107,6 +116,7 @@ async function main() {
   // Restauration de l'état démo (rerun-safe) : active, perpétuelle, plan nettoyé
   await pool.query("UPDATE licences SET expires_at = NULL, plan = NULL WHERE restaurant_id = $1", [rid]);
 
+  if (deviceId) await fetch(`${B}/api/devices/${deviceId}`, { method: "DELETE", headers: H(jar) });
   console.log(`\nTC-LIC : ${pass} PASS, ${fail} FAIL`);
   await pool.end();
   process.exit(fail > 0 ? 1 : 0);

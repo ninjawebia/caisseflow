@@ -191,3 +191,15 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | APK | `output/apk/caisseflow-0.8.0-release.apk` — **versionName 0.8.0, versionCode 6** (`aapt2`), `libexpo-sqlite`/`libexpo-crypto`/`libexpo-secure-store` présents, bundle contenant `Carte locale`, `prix_ttc_cents`, `tables_resto`, `Synchroniser` et le SQL de désactivation ; ancien APK 0.7.0 retiré |
 | Écart PRD | aucun (PRD 4.2). Photos d'articles (`photo_hash` stocké, image non téléchargée), variantes/suppléments et gestion des salles côté caisse restent hors périmètre approuvé (candidats backlog, non implémentés) |
 | Commit | `e7fe576` (poussé) |
+
+## Correctif 0.8.1 — HTTP en clair refusé par Android (2026-11-19)
+
+| Élément | Résultat |
+| --- | --- |
+| Symptôme | Enrôlement impossible sur tablette : adresse `http://192.168.1.129:3000` acceptée mais « Serveur injoignable », alors que `/api/health` répond 200 depuis le réseau. |
+| Cause | `targetSdk 34` : Android bloque le HTTP en clair en build **release** (`usesCleartextTraffic` absent du manifeste généré par Expo). |
+| Correctif | `apps/mobile/plugins/withCleartextTraffic.js` (plugin Expo `withAndroidManifest`) déclaré dans `app.json` → `android:usesCleartextTraffic="true"` à chaque prebuild. Aucun fichier natif maintenu à la main. |
+| Portée | Back-office local du restaurant (HTTP sur LAN). En exposition Internet : HTTPS obligatoire et plugin à retirer. |
+| Vérification | Manifeste APK 0.8.1 : `usesCleartextTraffic=true` ; tests mobile **116/116**, web **106/106** sur **deux passages consécutifs** ; `make smoke` PASS. |
+| APK | `output/apk/caisseflow-0.8.1-release.apk` (versionCode 7, seul APK conservé). |
+| Tests rendus rerun-safe | Les batteries web dépendaient du jeton démo `device-token-demo-POSTE-01`, que le gérant révoque légitimement en créant le jeton d'une vraie tablette (3 échecs constatés). `backlog-features` (POSTE-78) et `licence-features` (POSTE-79) créent désormais leur **propre jeton dédié** avant les assertions et le révoquent en fin de passage ; deux passages consécutifs sont verts et le jeton réel de la tablette reste actif. |

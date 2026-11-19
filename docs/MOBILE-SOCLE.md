@@ -154,6 +154,15 @@ l'agent). **expo-sqlite est retenu** parce que :
 3. moins de dépendances natives à lier dans l'APK, base SQLite standard donc
    **extractible et auditable** (exigence fiscale).
 
+## 8 bis. Réseau : HTTP en clair sur le réseau du restaurant
+
+Le back-office est déployé **localement** (`http://<ip-lan>:3000`). Depuis
+Android 9 (`targetSdk >= 28`), une build release refuse le HTTP en clair :
+`plugins/withCleartextTraffic.js` pose `android:usesCleartextTraffic="true"` sur
+le manifeste généré par `expo prebuild`. Sans ce plugin, l'enrôlement échoue
+avec « Serveur injoignable » même si le serveur répond. Pour une exposition
+Internet, passer en HTTPS et retirer le plugin.
+
 ## 9. Limites assumées (M1–M4)
 
 - Navigation minimaliste (2 écrans, machine à états) : la pile d'écrans POS

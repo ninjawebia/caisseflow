@@ -29,6 +29,15 @@ async function main() {
   const jarC = await login("comptable@local.test", "Compta123!");
   const H = (cookie) => ({ "Content-Type": "application/json", Origin: B, Cookie: cookie });
 
+  // Jeton d'appareil DÉDIÉ à la batterie (rerun-safe). Le jeton de démo peut
+  // être révoqué par le gérant dès qu'il enrôle une vraie tablette (usage
+  // normal) : un test ne doit jamais dépendre de son état.
+  const dev = await fetch(`${B}/api/devices`, { method: "POST", headers: H(jar), body: JSON.stringify({ poste: "POSTE-78" }) });
+  const devBody = await dev.json().catch(() => ({}));
+  const deviceToken = devBody.token;
+  const deviceId = devBody.device && devBody.device.id;
+  if (!deviceToken) throw new Error(`création du jeton de test → HTTP ${dev.status}`);
+
   // TC-BO1-CAT-001 : création
   const c1 = await fetch(`${B}/api/categories`, { method: "POST", headers: H(jar), body: JSON.stringify({ nom: `Boissons froides ${SFX}` }) });
   const cat = await c1.json().catch(() => ({}));
@@ -63,7 +72,7 @@ async function main() {
   const arch = await fetch(`${B}/api/categories/${cat.category.id}`, { method: "PATCH", headers: H(jar), body: JSON.stringify({ actif: false }) });
   const archb = await arch.json().catch(() => ({}));
   check("TC-BO1-CAT-005", arch.status === 200 && archb.category?.actif === false, `HTTP ${arch.status}`);
-  const pull = await fetch(`${B}/api/sync/pull`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer device-token-demo-POSTE-01" }, body: "{}" });
+  const pull = await fetch(`${B}/api/sync/pull`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${deviceToken}` }, body: "{}" });
   const pullb = await pull.json().catch(() => ({}));
   check("TC-BO1-CAT-007", pull.status === 200 && !(pullb.categories || []).some((c) => c.id === cat.category?.id), "archivée absente du sync pull");
 
@@ -168,11 +177,11 @@ async function main() {
 
   // TC-BO1-PHOTO-007 : GET sans authentification → 403 ; avec jeton appareil → 200
   const noAuth = await fetch(`${B}/api/articles/${art2id}/photo`);
-  const device = await fetch(`${B}/api/articles/${art2id}/photo`, { headers: { Authorization: "Bearer device-token-demo-POSTE-01" } });
+  const device = await fetch(`${B}/api/articles/${art2id}/photo`, { headers: { Authorization: `Bearer ${deviceToken}` } });
   check("TC-BO1-PHOTO-007", noAuth.status === 403 && device.status === 200, `HTTP ${noAuth.status}/${device.status}`);
 
   // TC-BO1-PHOTO-008 : sync pull expose photo_hash
-  const pull2 = await fetch(`${B}/api/sync/pull`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer device-token-demo-POSTE-01" }, body: "{}" });
+  const pull2 = await fetch(`${B}/api/sync/pull`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${deviceToken}` }, body: "{}" });
   const pull2b = await pull2.json().catch(() => ({}));
   const inPull = (pull2b.articles || []).find((a) => a.id === art2id);
   check("TC-BO1-PHOTO-008", pull2.status === 200 && inPull && typeof inPull.photo_hash === "string", "photo_hash dans le sync pull");
@@ -212,6 +221,8 @@ async function main() {
   console.log(`\nTC-UI-MENU : ${pass - u1} PASS, ${fail - u2} FAIL`);
 
   console.log(`\nTOTAL : ${pass} PASS, ${fail} FAIL`);
+  // Nettoyage : le jeton d'appareil de test est révoqué (jamais supprimé).
+  if (deviceId) await fetch(`${B}/api/devices/${deviceId}`, { method: "DELETE", headers: H(jar) });
   await pool.end();
   process.exit(fail > 0 ? 1 : 0);
 }
