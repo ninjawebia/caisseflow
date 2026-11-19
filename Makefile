@@ -196,7 +196,7 @@ fix-perms:
 
 info:
 	@echo "================ CaisseFlow — POS restaurant conforme NF525 ================"
-	@echo "Application : CaisseFlow (mono-repo conteneurisé, v0.1.0)"
+	@echo "Application : CaisseFlow — back-office v0.1.0 · caisse mobile v0.9.0"
 	@echo "Web         : http://localhost:3000   (adminer :8081 · mailhog :8025)"
 	@echo "Base        : service compose 'postgres' — réseau caisseflow-net (5433 exposé)"
 	@echo ""
@@ -205,8 +205,15 @@ info:
 	@echo ""
 	@echo "Comptes web : gerant@local.test/Gerant123! · comptable@local.test/Compta123!"
 	@echo "              auditeur@local.test/Audit123! · admin@local.test/Admin123!"
-	@echo "Matricules  : MGR 1234 · SEC 2345 · S07 3456 · K01 4567"
-	@echo "Jeton appareil : device-token-demo-POSTE-01"
+	@echo ""
+	@echo "Caisse mobile (tablette Android) :"
+	@echo "  Serveur    : http://<IP-LAN>:3000  (ex. http://192.168.1.129:3000)"
+	@echo "  Jeton      : Back-office → Appareils → créer POSTE-01 (affiché UNE fois)"
+	@echo "               le jeton démo device-token-demo-POSTE-01 est révoqué"
+	@echo "  Connexion  : matricule + PIN — serveur (S07 / 3456 en démo)"
+	@echo "               gérant MGR/1234 · second SEC/2345 · cuisine K01/4567"
+	@echo "               authentification 100 % locale, après synchro du personnel"
+	@echo "  Nouveau staff : Back-office → /utilisateurs (rôle serveur, PIN 4–6 chiffres)"
 	@echo "⚠ Démo uniquement — ne jamais exécuter 'make seed' en production"
 	@echo "============================================================================"
 
