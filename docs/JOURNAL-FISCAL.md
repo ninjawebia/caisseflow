@@ -82,10 +82,11 @@ fausse rupture (défaut corrigé en M2, régression `TC-CHAIN`).
 
 ## 6. Limites assumées
 
-- **Aucune écriture métier n'est encore branchée** : M2 livre le moteur, les
-  écrans de commande (M5) et d'encaissement (M6) l'alimenteront avec
-  l'utilisateur authentifié (M3). Aucune écriture de démonstration n'est jamais
-  insérée dans un journal fiscal.
+- **Envoi en cuisine = VENTE de pré-encaissement (M5)** : `sendOrder` écrit une
+  VENTE auto-porteuse (prix figés, quantités, TVA par taux) avec l'utilisateur
+  authentifié (M3), puis gèle les lignes. L'encaissement et le ticket
+  (PAIEMENT/TICKET) arrivent avec M6. Aucune écriture de démonstration n'est
+  jamais insérée dans un journal fiscal.
 - **Scellé Z signé** : M8 (clé asymétrique du Keystore), pas M2.
 - **Pas de chiffrement de la base au repos** : SQLite en clair dans le sandbox
   applicatif Android ; le scellement fiscal repose sur le chaînage + les

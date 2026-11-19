@@ -140,6 +140,31 @@ et bcryptjs.
   la synchronisation du démarrage est silencieuse et son échec ne bloque rien.
   L'enrôlement persiste la carte téléchargée sans second appel réseau.
 
+## 7 bis. Prise de commande (M5)
+
+La caisse travaille **hors ligne** sur la carte locale :
+
+- **Plan de salle** (`TablesScreen`) : tables actives groupées par salle,
+  occupation et total de la commande en cours, bouton « Comptoir / à emporter ».
+- **Commande** (`OrderScreen`) : catégories, articles, panier avec quantités,
+  totaux TTC et ventilation de TVA, bouton « Envoyer en cuisine ».
+- **Brouillon** : une commande ouverte n'écrit rien au journal. Les lignes
+  portent le **prix figé** du moment (snapshot) — un changement de prix au
+  back-office ne réécrit jamais une commande en cours.
+- **Envoi** : `sendOrder` écrit **une** VENTE de pré-encaissement (payload
+  auto-porteur : `commande_id`, lignes envoyées, total d'envoi, total commande,
+  TVA par taux), gèle les lignes (`envoyee = 1`) et marque la commande
+  `ENVOYEE`. La table reste occupée jusqu'à l'encaissement (M6).
+- **Complément** : un ajout après envoi crée une nouvelle ligne non envoyée ;
+  le prochain envoi écrit une 2ᵉ VENTE avec `complement: true`.
+- **Une table = une commande active**, garanti par index unique partiel
+  (`WHERE statut IN ('OUVERTE','ENVOYEE')`), pas seulement par l'écran.
+- **Atomicité** : journal + lignes + commande dans une seule transaction ; un
+  envoi refusé ne laisse ni vente orpheline ni commande incohérente.
+- **Poste** : le pull expose `poste` (figé sur le jeton côté serveur) ; la
+  tablette le persiste (`device.poste`) et l'utilise comme préfixe de la
+  numérotation fiscale (`POSTE-01-000001`).
+
 ## 8. Décision technique : expo-sqlite (pas WatermelonDB)
 
 Le PRD mentionne WatermelonDB en hypothèse (`[ASSUMPTION]`, décision laissée à
@@ -163,13 +188,18 @@ le manifeste généré par `expo prebuild`. Sans ce plugin, l'enrôlement échou
 avec « Serveur injoignable » même si le serveur répond. Pour une exposition
 Internet, passer en HTTPS et retirer le plugin.
 
-## 9. Limites assumées (M1–M4)
+## 9. Limites assumées (M1–M5)
 
-- Navigation minimaliste (2 écrans, machine à états) : la pile d'écrans POS
-  arrive avec M5, quand les écrans de commande existent.
-- Aucune écriture métier n'est encore branchée : le journal (M2) est un moteur
-  vérifié, alimenté par les encaissements M5/M6 avec l'utilisateur authentifié
-  de M3. Aucune écriture de démonstration n'est insérée dans un journal fiscal.
+- Navigation par machine à états (`home | tables | order`) : pas encore de
+  bibliothèque de navigation, ce qui suffit aux écrans POS actuels. L'écran
+  d'encaissement et le ticket arrivent avec M6.
+- Le journal est alimenté par l'envoi en cuisine (M5, VENTE de
+  pré-encaissement) avec l'utilisateur authentifié de M3 ; l'encaissement et le
+  ticket (PAIEMENT/TICKET) arrivent avec M6. Aucune écriture de démonstration
+  n'est insérée dans un journal fiscal.
+- Les lignes envoyées ne sont ni annulées ni modifiées à bord (l'annulation
+  avec motif + second est un écran dédié, hors périmètre M5) ; le transfert de
+  table et le KDS restent à venir.
 - La tablette ne **génère** pas de hash bcrypt (seulement `compareSync`) : le
   changement de PIN se fait depuis le back-office. Le substitut `crypto`
   (`src/shims/crypto.js`) échoue explicitement si une génération était tentée.

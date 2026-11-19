@@ -51,7 +51,7 @@ test("migration 4 : tables de référence, contraintes de prix et de places", as
   const db = await freshDb();
   const tables = (await db.getAllAsync("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")).map((r) => r.name);
   for (const t of ["articles", "categories", "tables_resto"]) assert.ok(tables.includes(t), t);
-  assert.equal((await db.getFirstAsync("PRAGMA user_version")).user_version, 4);
+  assert.equal((await db.getFirstAsync("PRAGMA user_version")).user_version, latestVersion());
 
   // Prix en centimes ENTIERS : ni flottant, ni hors plafond.
   await assert.rejects(() => db.runAsync(

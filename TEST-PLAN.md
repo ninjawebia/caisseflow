@@ -725,3 +725,41 @@ Batterie **rerun-safe** : poste dédié `POSTE-77`, jeton aléatoire à chaque r
 | TC-M4-SYNC-10 | Serveur local | `POST /api/sync/pull` avec le jeton démo | Catégories avec `actif: true` explicite, 144 articles, 8 tables, licence `active`, `serverTime` présent | PASS |
 
 **Exécution du 2026-11-19** : mobile **116/116 PASS** (`make test-mobile`, image mobile) ; web **106/106 PASS**. Total projet **222 PASS / 0 FAIL** ; `make smoke` PASS ; APK `0.8.0` (versionCode 6) vérifié.
+
+## 31. Prise de commande — TC-M5 (PRD POS-1/2/3, implémenté le 2026-11-19)
+
+> La caisse prend une commande **hors ligne** sur la carte locale. Une commande
+> est un **brouillon local** : rien n'entre au journal fiscal avant l'envoi en
+> cuisine. L'envoi écrit une **VENTE** de pré-encaissement (payload
+> auto-porteur), gèle les lignes envoyées et laisse la table occupée jusqu'à
+> l'encaissement (M6). Un ajout après envoi produit un **complément** (2ᵉ
+> VENTE). Les prix sont **figés à l'ajout** (snapshot) : aucune relecture du
+> catalogue ne réécrit une commande en cours. Une table ne porte qu'**une**
+> commande active, garanti par index unique partiel SQLite (pas seulement par
+> l'écran).
+
+| ID | Précondition | Action | Attendu | Statut |
+| --- | --- | --- | --- | --- |
+| TC-M5-QTE-01 | — | Quantités 1, 99 puis 0, −1, 1,5, 100, `"2"`, `null`, `NaN` | Entiers 1..99 acceptés ; tout le reste refusé `COMMANDE` | PASS |
+| TC-M5-ART-01 | — | Article valide, puis sans id, sans nom, prix flottant/absent/négatif/> plafond, TVA 101 | Article normalisé ; 7 motifs de refus explicites | PASS |
+| TC-M5-CART-01 | Panier vide | Ajout 1 puis 2 du même article/prix | Une ligne fusionnée, quantité 3, même identifiant | PASS |
+| TC-M5-CART-02 | Ligne à 10,00 € | Ajout du même article à 12,50 € | **Nouvelle** ligne : le prix figé de l'ancienne est conservé | PASS |
+| TC-M5-CART-03 | Ligne envoyée | Ajout du même article | Nouvelle ligne non envoyée (complément), l'envoyée reste intacte | PASS |
+| TC-M5-CART-04 | Ligne à 98 | Ajout de 2 | Refusé (maximum 99 par ligne) | PASS |
+| TC-M5-CART-05 | 1 ligne | `changeQty` 3 ; quantité 0 ; ligne inconnue ; suppression | Mise à jour ou refus motivé ; suppression effective ; inconnue refusée | PASS |
+| TC-M5-SEND-00 | Ligne envoyée seule / panier vide | `unsentLines`, `assertSendable` | Seules les lignes non envoyées partent ; envoi vide refusé | PASS |
+| TC-M5-TOT-01 | 2 × 10,00 € à 10 % + 1 × 5,00 € à 20 % | `orderTotals` | TTC 2 500 ; TVA 182 + 83 ; HT+TVA = TTC par taux ; somme des taux = total | PASS |
+| TC-M5-TOT-02 | — | Quantité 0, prix flottant, TVA négative, panier vide | Entrées invalides refusées ; vide = 0 sans erreur | PASS |
+| TC-M5-PAY-01 | 1 ligne non envoyée + 1 envoyée + 1 nouvelle | `buildSalePayload` | Payload auto-porteur : `commande_id`, table, lignes **non envoyées** uniquement, total d'envoi, total commande, TVA de l'envoi | PASS |
+| TC-M5-PAY-02 | — | Payload sans ligne / sans commande | Refus explicite | PASS |
+| TC-M5-DB-01 | SQLite neuve | Migrations 1→5 ; insertion directe d'une 2ᵉ commande active sur la même table ; type inconnu | Tables `commandes`/`commande_lignes`, index `idx_commandes_table_active` ; doublon refusé **par SQLite** ; type `LIVRAISON` refusé | PASS |
+| TC-M5-DB-02 | SQLite neuve | Création sans table, type inconnu, sans opérateur, doublon ; envoi puis nouvelle commande sur la table | Refus motivés ; la table reste occupée après envoi (jusqu'à l'encaissement M6) | PASS |
+| TC-M5-DB-03 | Commande ouverte | Ajouts 2+1 du même article, autre article, article revalorisé ; quantité ; suppression | Total persisté 4 000 puis recalculé ; prix figé 1 250 conservé ; fusion et nouvelle ligne conformes | PASS |
+| TC-M5-DB-04 | Commande avec 2 lignes | `sendOrder` | VENTE `POSTE-01-000001` au journal (chaîne vérifiée), lignes `envoyee=1`, commande `ENVOYEE`, table occupée, total 2 750 | PASS |
+| TC-M5-DB-05 | Commande envoyée | Modification/suppression d'une ligne envoyée ; second envoi sans nouvelle ligne | Les deux écritures sont refusées ; aucun doublon au journal | PASS |
+| TC-M5-DB-06 | Commande envoyée | Ajout d'un article puis envoi | 2ᵉ VENTE (`POSTE-01-000002`) marquée `complement: true`, total d'envoi 500, total commande 1 750 | PASS |
+| TC-M5-DB-07 | Commande avec 1 ligne | Envoi avec utilisateur invalide (matricule 20 caractères) | **Atomicité** : aucune VENTE, commande toujours `OUVERTE`, ligne toujours `envoyee=0` ; envoi valide ensuite | PASS |
+| TC-M5-DB-08 | 1 table + 2 comptoirs | Ajout sur la table, `listOpenOrders`, `openOrdersByTable` | 3 commandes ouvertes ; plan de salle indexé par `table_id` uniquement ; table libre absente | PASS |
+| TC-M5-SYNC-001 | Serveur local | `POST /api/sync/pull` avec le jeton dédié POSTE-78 | Le pull expose `poste: "POSTE-78"` (préfixe fiscal persisté par la caisse) | PASS |
+
+**Exécution du 2026-11-19** : mobile **135/135 PASS** (`make test-mobile`, image mobile, `node:sqlite` inclus) ; web **107/107 PASS**. Total projet **242 PASS / 0 FAIL** ; `make smoke` PASS ; APK `0.9.0` (versionCode 8) vérifié.

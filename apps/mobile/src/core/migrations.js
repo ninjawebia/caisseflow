@@ -147,6 +147,55 @@ const MIGRATIONS = [
        )`,
     ],
   },
+  {
+    version: 5,
+    name: "commandes",
+    statements: [
+      // Commandes en cours (M5). Ce sont des BROUILLONS locaux : rien n'entre
+      // au journal avant l'envoi en cuisine (POS-3), qui écrit une VENTE.
+      `CREATE TABLE IF NOT EXISTS commandes (
+         id TEXT PRIMARY KEY,
+         poste TEXT NOT NULL CHECK (length(trim(poste)) BETWEEN 1 AND 16),
+         type TEXT NOT NULL CHECK (type IN ('TABLE','COMPTOIR')),
+         table_id TEXT,
+         table_nom TEXT,
+         statut TEXT NOT NULL DEFAULT 'OUVERTE' CHECK (statut IN ('OUVERTE','ENVOYEE','ENCAISSEE')),
+         total_ttc_cents INTEGER NOT NULL DEFAULT 0
+           CHECK (typeof(total_ttc_cents) = 'integer' AND total_ttc_cents BETWEEN 0 AND 100000000),
+         created_by TEXT NOT NULL,
+         created_by_nom TEXT NOT NULL,
+         created_at TEXT NOT NULL,
+         sent_at TEXT,
+         journal_ref TEXT,
+         CHECK ((type = 'TABLE' AND table_id IS NOT NULL AND table_nom IS NOT NULL)
+             OR (type = 'COMPTOIR' AND table_id IS NULL))
+       )`,
+      // Une table = UNE commande active au maximum (POS-1) : garanti par la base,
+      // pas seulement par l'écran. Une commande envoyée occupe encore la table
+      // jusqu'à l'encaissement.
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_commandes_table_active
+         ON commandes(poste, table_id)
+         WHERE statut IN ('OUVERTE','ENVOYEE') AND table_id IS NOT NULL`,
+      `CREATE INDEX IF NOT EXISTS idx_commandes_active
+         ON commandes(poste, statut)`,
+      // Lignes : prix FIGÉ à l'ajout (snapshot, POS-2). Aucun lien de prix vers
+      // `articles` : un changement de prix au back-office ne réécrit jamais une
+      // commande en cours.
+      `CREATE TABLE IF NOT EXISTS commande_lignes (
+         id TEXT PRIMARY KEY,
+         commande_id TEXT NOT NULL REFERENCES commandes(id) ON DELETE RESTRICT,
+         article_id TEXT NOT NULL,
+         nom TEXT NOT NULL,
+         prix_ttc_cents INTEGER NOT NULL
+           CHECK (typeof(prix_ttc_cents) = 'integer' AND prix_ttc_cents BETWEEN 0 AND 1000000),
+         taux_tva REAL NOT NULL CHECK (taux_tva BETWEEN 0 AND 100),
+         qte INTEGER NOT NULL CHECK (typeof(qte) = 'integer' AND qte BETWEEN 1 AND 99),
+         envoyee INTEGER NOT NULL DEFAULT 0 CHECK (envoyee IN (0,1)),
+         created_at TEXT NOT NULL
+       )`,
+      `CREATE INDEX IF NOT EXISTS idx_commande_lignes_cmd ON commande_lignes(commande_id)`,
+    ],
+  },
 ];
 
 function latestVersion() {

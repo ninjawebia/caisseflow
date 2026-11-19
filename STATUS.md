@@ -203,3 +203,18 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | Vérification | Manifeste APK 0.8.1 : `usesCleartextTraffic=true` ; tests mobile **116/116**, web **106/106** sur **deux passages consécutifs** ; `make smoke` PASS. |
 | APK | `output/apk/caisseflow-0.8.1-release.apk` (versionCode 7, seul APK conservé). |
 | Tests rendus rerun-safe | Les batteries web dépendaient du jeton démo `device-token-demo-POSTE-01`, que le gérant révoque légitimement en créant le jeton d'une vraie tablette (3 échecs constatés). `backlog-features` (POSTE-78) et `licence-features` (POSTE-79) créent désormais leur **propre jeton dédié** avant les assertions et le révoquent en fin de passage ; deux passages consécutifs sont verts et le jeton réel de la tablette reste actif. |
+
+## Module 24 — Prise de commande (M5, 2026-11-19)
+
+| Élément | Résultat |
+| --- | --- |
+| Besoin | La caisse doit prendre une commande **hors ligne** (tables + comptoir), l'envoyer en cuisine et l'écrire au journal (PRD POS-1/2/3). M4 fournissait la carte locale, aucun écran de saisie. |
+| Livré | migration 5 (`commandes`, `commande_lignes`, index unique partiel `idx_commandes_table_active` : **une** commande active par table) ; `core/orders.js` (quantités 1..99, validation d'article, fusion des lignes non envoyées, prix figé, `orderTotals` avec TVA extraite du TTC par ligne, `buildSalePayload` auto-porteur) ; `db/orders-sql.js` et `db/orders.js` (`createOrder`, `getOrder`, `listOpenOrders`, `openOrdersByTable`, `addArticle`, `setLineQty`, `removeLine`, `sendOrder` transactionnel) ; `TablesScreen` (plan de salle par salle, occupation + total, comptoir) ; `OrderScreen` (catégories, articles, panier ±, totaux TTC/TVA, envoi en cuisine) ; accueil (« Prendre une commande ») ; navigation `home | tables | order` avec verrouillage inactivité/arrière-plan conservé ; pull web enrichi de `poste` et persistance `device.poste` |
+| Envoi en cuisine | Une **VENTE** de pré-encaissement (POS-3) : payload auto-porteur contenant lignes envoyées, prix figés, total d'envoi, total commande et TVA par taux. Les lignes passent `envoyee = 1` (plus modifiables) et la commande `ENVOYEE` avec `journal_ref` (`POSTE-01-000001`). La table reste occupée jusqu'à l'encaissement (M6). |
+| Complément | Un ajout après envoi ne modifie jamais une ligne envoyée : il crée une ligne non envoyée, et l'envoi suivant écrit une 2ᵉ VENTE `complement: true`. |
+| Atomicité | Journal, lignes et commande dans **une seule transaction** : un envoi refusé laisse la commande `OUVERTE`, les lignes non envoyées et **aucune** vente au journal (prouvé par TC-M5-DB-07). |
+| Défense en profondeur | L'unicité de la commande active est garantie par **SQLite** (index partiel), pas seulement par l'écran ; un doublon est refusé même en SQL direct. Totaux en centimes entiers, aucune arithmétique flottante. |
+| Tests | mobile **135/135 PASS** (dont 19 nouveaux : 12 logique pure + 7 sur vraie base SQLite) ; web **107/107 PASS** (nouveau TC-M5-SYNC-001 sur `poste`) ; total **242 PASS / 0 FAIL** ; `make smoke` PASS |
+| APK | `output/apk/caisseflow-0.9.0-release.apk` — **versionName 0.9.0, versionCode 8** (`aapt2`), `usesCleartextTraffic=true` (HTTP LAN), bundle contenant `Prise de commande`, `Envoyer en cuisine`, `idx_commandes_table_active` et le garde-fou de poste (UTF-16 Hermes). Ancien APK 0.8.1 retiré. |
+| Écart PRD | aucun (PRD 4.1.2 / POS-1..3). Transfert de table, annulation de ligne envoyée avec motif + second, KDS et encaissement restent aux modules suivants (M6–M9). |
+| Commit | (à remplir) |

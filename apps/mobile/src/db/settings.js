@@ -5,6 +5,7 @@
 const KEYS = {
   lastPullAt: "last.pull.at",
   licenceEtat: "licence.etat",
+  devicePoste: "device.poste",
 };
 
 async function getSetting(db, key) {

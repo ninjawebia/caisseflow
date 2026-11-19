@@ -72,6 +72,7 @@ async function pullReference({ serverUrl, token, since, fetchImpl, timeoutMs }) 
   return {
     serverUrl: base,
     token: clean,
+    poste: (data && data.poste) || null,
     licence: etat,
     licenceLabel: licenceLabel(etat),
     minAppVersion,
@@ -106,6 +107,7 @@ async function enroll({ serverUrl, token, appVersion, fetchImpl, timeoutMs }) {
   return {
     serverUrl: pulled.serverUrl,
     token: pulled.token,
+    poste: pulled.poste,
     licence: pulled.licence,
     licenceLabel: pulled.licenceLabel,
     minAppVersion: pulled.minAppVersion,

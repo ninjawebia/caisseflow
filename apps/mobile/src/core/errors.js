@@ -9,6 +9,7 @@ const CODES = {
   SERVER: "SERVER",     // réponse inattendue du serveur
   VERSION: "VERSION",   // version d'application trop ancienne (SEC-2)
   STORAGE: "STORAGE",   // Keystore / SQLite indisponible
+  COMMANDE: "COMMANDE", // prise de commande refusée (quantité, ligne, envoi)
 };
 
 class CaisseError extends Error {

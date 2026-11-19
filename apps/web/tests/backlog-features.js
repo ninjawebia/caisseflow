@@ -75,6 +75,9 @@ async function main() {
   const pull = await fetch(`${B}/api/sync/pull`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${deviceToken}` }, body: "{}" });
   const pullb = await pull.json().catch(() => ({}));
   check("TC-BO1-CAT-007", pull.status === 200 && !(pullb.categories || []).some((c) => c.id === cat.category?.id), "archivée absente du sync pull");
+  // M5 : le pull expose le poste du jeton (préfixe de la numérotation fiscale
+  // locale) — la caisse le persiste au lieu de le saisir à la main.
+  check("TC-M5-SYNC-001", pull.status === 200 && pullb.poste === "POSTE-78", `poste ${pullb.poste}`);
 
   // Ré-association puis suppression (TC-BO1-CAT-003)
   const uncat = await fetch(`${B}/api/articles/${catArtId}`, {

@@ -13,12 +13,20 @@ import BootScreen from "./src/screens/BootScreen";
 import EnrollmentScreen from "./src/screens/EnrollmentScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import HomeScreen from "./src/screens/HomeScreen";
+import TablesScreen from "./src/screens/TablesScreen";
+import OrderScreen from "./src/screens/OrderScreen";
 import { openAndMigrate } from "./src/db";
 import { assertChainIntact } from "./src/db/journal";
+import { newUuid } from "./src/native/random";
 import { authenticate, saveStaff, listStaff, recordLockEvent } from "./src/db/auth";
 import {
   saveReference, readReferenceCounts, getLastPull, setLastPull, setLicence, readLicence,
+  readMenu, readTables, setDevicePoste, readDevicePoste,
 } from "./src/db/reference";
+import {
+  createOrder, getOrder, openOrdersByTable,
+  addArticle, setLineQty, removeLine, sendOrder,
+} from "./src/db/orders";
 import { pullReference, assertAppVersion } from "./src/core/enrollment";
 import { SESSION_TIMEOUT_MS, shouldLockOnResume, formatDuration } from "./src/core/auth";
 import { loadEnrollment, saveEnrollment, clearEnrollment } from "./src/storage/device";
@@ -26,6 +34,8 @@ import { colors, font, radius, space } from "./src/ui/theme";
 
 const APP_VERSION = appConfig.expo.version;
 const INACTIVITY_TICK_MS = 15000;
+// Phases pendant lesquelles la session opérateur est active (verrouillage auto).
+const SERVICE_PHASES = ["home", "tables", "order"];
 
 const LOCK_MSG_INACTIVITY = `Verrouillé automatiquement après ${formatDuration(SESSION_TIMEOUT_MS)} d'inactivité.`;
 const LOCK_MSG_BACKGROUND = "Verrouillé : l'application est restée en arrière-plan.";
@@ -48,6 +58,14 @@ export default function App() {
   const [reference, setReference] = useState(EMPTY_REFERENCE);
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncError, setSyncError] = useState(null);
+  const [poste, setPoste] = useState(null);
+  const [menu, setMenu] = useState([]);
+  const [tables, setTables] = useState([]);
+  const [openOrders, setOpenOrders] = useState({});
+  const [active, setActive] = useState(null); // { order, lines, totals }
+  const [orderBusy, setOrderBusy] = useState(false);
+  const [orderError, setOrderError] = useState(null);
+  const [orderNotice, setOrderNotice] = useState(null);
 
   const dbRef = useRef(null);
   const userRef = useRef(null);
@@ -73,6 +91,21 @@ export default function App() {
       readLicence(db),
     ]);
     setReference({ counts, lastPull, licence });
+  }, []);
+
+  // État de service (M5) : identifiant de poste (préfixe fiscal), carte
+  // groupée, tables actives et occupation locale.
+  const loadServiceState = useCallback(async (db) => {
+    if (!db) return;
+    const [posteValue, groups, tableList] = await Promise.all([
+      readDevicePoste(db),
+      readMenu(db),
+      readTables(db),
+    ]);
+    setPoste(posteValue || null);
+    setMenu(groups);
+    setTables(tableList);
+    setOpenOrders(posteValue ? await openOrdersByTable(db, posteValue) : {});
   }, []);
 
   // Synchronisation complète : articles en DELTA (`since` = heure serveur du
@@ -107,6 +140,9 @@ export default function App() {
       const at = pulled.serverTime || new Date().toISOString();
       await setLastPull(db, at);
       await setLicence(db, pulled.licence);
+      // Le poste est figé sur le jeton côté serveur : il préfixe la
+      // numérotation fiscale locale (`POSTE-01-000001`).
+      await setDevicePoste(db, pulled.poste);
 
       setReference({
         counts: await readReferenceCounts(db),
@@ -114,6 +150,7 @@ export default function App() {
         licence: pulled.licence,
       });
       setStaff(await listStaff(db));
+      await loadServiceState(db);
       return pulled;
     } catch (e) {
       if (!silent) setSyncError(e && e.message ? e.message : "Synchronisation impossible");
@@ -121,7 +158,7 @@ export default function App() {
     } finally {
       if (!silent) setSyncBusy(false);
     }
-  }, []);
+  }, [loadServiceState]);
 
   // Bouton « Synchroniser » de l'écran de connexion : même chemin, indicateur
   // de chargement local au personnel.
@@ -156,6 +193,7 @@ export default function App() {
       // ligne immédiatement ; la synchronisation tente ensuite une mise à jour
       // silencieuse (son échec ne bloque jamais le service).
       await loadReferenceState(opened.db);
+      await loadServiceState(opened.db);
       let list = await listStaff(opened.db);
       if (list.filter((s) => s.actif).length === 0) {
         try {
@@ -174,7 +212,7 @@ export default function App() {
       setBootError(e && e.message ? e.message : "Démarrage impossible");
       setPhase("error");
     }
-  }, [loadReferenceState, refreshStaff, syncNow]);
+  }, [loadReferenceState, loadServiceState, refreshStaff, syncNow]);
 
   useEffect(() => { boot(); }, [boot]);
 
@@ -192,15 +230,17 @@ export default function App() {
         await setLastPull(db, result.serverTime || new Date().toISOString());
       }
       if (result.licence) await setLicence(db, result.licence);
+      await setDevicePoste(db, result.poste);
       if (Array.isArray(result.staff) && result.staff.length) {
         await saveStaff(db, result.staff);
       }
       await loadReferenceState(db);
+      await loadServiceState(db);
       setStaff(await listStaff(db));
     }
     setLockReason(null);
     setPhase("login");
-  }, [loadReferenceState]);
+  }, [loadReferenceState, loadServiceState]);
 
   const handleReset = useCallback(async () => {
     await clearEnrollment();
@@ -209,6 +249,13 @@ export default function App() {
     setUser(null);
     setReference(EMPTY_REFERENCE);
     setSyncError(null);
+    setPoste(null);
+    setMenu([]);
+    setTables([]);
+    setOpenOrders({});
+    setActive(null);
+    setOrderError(null);
+    setOrderNotice(null);
     setPhase("enroll");
   }, []);
 
@@ -235,18 +282,177 @@ export default function App() {
       }
     }
     setUser(null);
+    setActive(null);
+    setOrderError(null);
+    setOrderNotice(null);
     setLockReason(reason === "manual" ? "Verrouillé manuellement." : reason === "background" ? LOCK_MSG_BACKGROUND : LOCK_MSG_INACTIVITY);
     setPhase("login");
   }, []);
 
   const handleManualLock = useCallback(() => lock("manual"), [lock]);
 
+  const message = (e, fallback) => (e && e.message ? e.message : fallback);
+
+  // --- M5 : prise de commande -------------------------------------------
+  const refreshOpenOrders = useCallback(async () => {
+    const db = dbRef.current;
+    if (!db || !poste) return;
+    setOpenOrders(await openOrdersByTable(db, poste));
+  }, [poste]);
+
+  const openTables = useCallback(async () => {
+    setOrderError(null);
+    setOrderNotice(null);
+    setOrderBusy(true);
+    try {
+      const db = dbRef.current;
+      if (db) {
+        const [groups, tableList] = await Promise.all([readMenu(db), readTables(db)]);
+        setMenu(groups);
+        setTables(tableList);
+        await refreshOpenOrders();
+      }
+      setPhase("tables");
+    } catch (e) {
+      setOrderError(message(e, "Plan de salle indisponible"));
+    } finally {
+      setOrderBusy(false);
+    }
+  }, [refreshOpenOrders]);
+
+  const openOrder = useCallback(async (table) => {
+    const db = dbRef.current;
+    const current = userRef.current;
+    if (!db || !current) return;
+    setOrderBusy(true);
+    setOrderError(null);
+    setOrderNotice(null);
+    try {
+      let view = null;
+      const existing = table ? openOrders[table.id] : null;
+      if (existing) {
+        view = await getOrder(db, existing.id);
+      } else {
+        const created = await createOrder(db, {
+          poste,
+          type: table ? "TABLE" : "COMPTOIR",
+          table,
+          user: current,
+          uuidOp: newUuid,
+        });
+        view = {
+          order: created,
+          lines: [],
+          totals: { totalTtcCents: 0, nbArticles: 0, nbLignes: 0, tva: [] },
+        };
+      }
+      setActive(view);
+      setPhase("order");
+      await refreshOpenOrders();
+    } catch (e) {
+      setOrderError(message(e, "Commande impossible"));
+    } finally {
+      setOrderBusy(false);
+    }
+  }, [openOrders, poste, refreshOpenOrders]);
+
+  const leaveOrder = useCallback(() => {
+    const type = active && active.order ? active.order.type : null;
+    setActive(null);
+    setOrderError(null);
+    setOrderNotice(null);
+    setPhase(type === "TABLE" ? "tables" : "home");
+  }, [active]);
+
+  const handleAddArticle = useCallback(async (article) => {
+    const db = dbRef.current;
+    if (!db || !active) return;
+    setOrderBusy(true);
+    setOrderError(null);
+    setOrderNotice(null);
+    try {
+      const res = await addArticle(db, {
+        orderId: active.order.id,
+        article,
+        qte: 1,
+        uuidOp: newUuid,
+      });
+      setActive({ order: res.order, lines: res.lines, totals: res.totals });
+    } catch (e) {
+      setOrderError(message(e, "Article non ajouté"));
+    } finally {
+      setOrderBusy(false);
+    }
+  }, [active]);
+
+  const handleSetQty = useCallback(async (lineId, qte) => {
+    const db = dbRef.current;
+    if (!db || !active) return;
+    setOrderBusy(true);
+    setOrderError(null);
+    setOrderNotice(null);
+    try {
+      if (qte <= 0) {
+        const res = await removeLine(db, { orderId: active.order.id, lineId });
+        setActive({ order: { ...active.order, totalTtcCents: res.totals.totalTtcCents }, lines: res.lines, totals: res.totals });
+      } else {
+        const res = await setLineQty(db, { orderId: active.order.id, lineId, qte });
+        setActive({ order: { ...active.order, totalTtcCents: res.totals.totalTtcCents }, lines: res.lines, totals: res.totals });
+      }
+    } catch (e) {
+      setOrderError(message(e, "Quantité non modifiée"));
+    } finally {
+      setOrderBusy(false);
+    }
+  }, [active]);
+
+  const handleRemoveLine = useCallback(async (lineId) => {
+    if (!dbRef.current || !active) return;
+    setOrderBusy(true);
+    setOrderError(null);
+    setOrderNotice(null);
+    try {
+      const res = await removeLine(dbRef.current, { orderId: active.order.id, lineId });
+      setActive({ order: { ...active.order, totalTtcCents: res.totals.totalTtcCents }, lines: res.lines, totals: res.totals });
+    } catch (e) {
+      setOrderError(message(e, "Ligne non supprimée"));
+    } finally {
+      setOrderBusy(false);
+    }
+  }, [active]);
+
+  const handleSendOrder = useCallback(async () => {
+    const db = dbRef.current;
+    const current = userRef.current;
+    if (!db || !current || !active) return;
+    setOrderBusy(true);
+    setOrderError(null);
+    setOrderNotice(null);
+    try {
+      const res = await sendOrder(db, { orderId: active.order.id, user: current, uuidOp: newUuid });
+      setActive({ order: res.order, lines: res.lines, totals: res.totals });
+      setOrderNotice(
+        `${res.complement ? "Complément" : "Commande"} envoyé${res.complement ? "" : "e"} en cuisine · écriture ${res.entry.ref}`
+      );
+      await refreshOpenOrders();
+      // Le compteur du journal a changé : on rafraîchit l'état affiché.
+      if (dbRef.current) {
+        const journal = await assertChainIntact(dbRef.current);
+        setSchema((prev) => (prev ? { ...prev, journal } : prev));
+      }
+    } catch (e) {
+      setOrderError(message(e, "Envoi en cuisine impossible"));
+    } finally {
+      setOrderBusy(false);
+    }
+  }, [active, refreshOpenOrders]);
+
   // Inactivité : vérification périodique pendant le service (pas de minuteur
   // par frappe : un seul intervalle, remis à zéro par tout contact tactile).
   useEffect(() => {
-    if (phase !== "home") return undefined;
+    if (!SERVICE_PHASES.includes(phase)) return undefined;
     const timer = setInterval(() => {
-      if (phaseRef.current !== "home") return;
+      if (!SERVICE_PHASES.includes(phaseRef.current)) return;
       if (Date.now() - lastActivityRef.current >= SESSION_TIMEOUT_MS) lock("inactivity");
     }, INACTIVITY_TICK_MS);
     return () => clearInterval(timer);
@@ -260,7 +466,7 @@ export default function App() {
         backgroundAtRef.current = Date.now();
         return;
       }
-      if (next === "active" && phaseRef.current === "home") {
+      if (next === "active" && SERVICE_PHASES.includes(phaseRef.current)) {
         if (shouldLockOnResume(backgroundAtRef.current, Date.now())) lock("background");
         backgroundAtRef.current = null;
       }
@@ -302,6 +508,50 @@ export default function App() {
   }
 
   // phase === "home" — sans utilisateur (verrou en cours), retour à la connexion.
+  if (user && enrollment && schema && phase === "tables") {
+    return (
+      <TablesScreen
+        tables={tables}
+        openOrders={openOrders}
+        menuEmpty={menu.length === 0 || menu.every((g) => !g.articles.length)}
+        busy={orderBusy}
+        error={orderError}
+        poste={poste}
+        user={user}
+        onBack={() => { setOrderError(null); setPhase("home"); }}
+        onLock={handleManualLock}
+        onOpenTable={openOrder}
+        onComptoir={() => openOrder(null)}
+        onSync={() => syncNow({ silent: false }).catch(() => {})}
+        onActivity={markActivity}
+        appVersion={APP_VERSION}
+      />
+    );
+  }
+
+  if (user && enrollment && schema && phase === "order" && active) {
+    return (
+      <OrderScreen
+        order={active.order}
+        lines={active.lines}
+        totals={active.totals}
+        menu={menu}
+        busy={orderBusy}
+        error={orderError}
+        notice={orderNotice}
+        user={user}
+        onBack={leaveOrder}
+        onLock={handleManualLock}
+        onAddArticle={handleAddArticle}
+        onSetQty={handleSetQty}
+        onRemove={handleRemoveLine}
+        onSend={handleSendOrder}
+        onActivity={markActivity}
+        appVersion={APP_VERSION}
+      />
+    );
+  }
+
   if (user && enrollment && schema) {
     return (
       <HomeScreen
@@ -316,6 +566,7 @@ export default function App() {
         onReset={handleReset}
         onLock={handleManualLock}
         onActivity={markActivity}
+        onNewOrder={openTables}
       />
     );
   }

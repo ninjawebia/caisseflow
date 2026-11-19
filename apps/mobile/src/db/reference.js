@@ -104,6 +104,16 @@ async function readLicence(db) {
   return getSetting(db, KEYS.licenceEtat);
 }
 
+// Identifiant de poste (`POSTE-01`) renvoyé par le pull : il est figé sur le
+// jeton d'appareil côté serveur et sert de préfixe à la numérotation fiscale.
+async function setDevicePoste(db, poste) {
+  if (poste) await setSetting(db, KEYS.devicePoste, poste);
+}
+
+async function readDevicePoste(db) {
+  return getSetting(db, KEYS.devicePoste);
+}
+
 module.exports = {
   saveReference,
   readReferenceCounts,
@@ -113,4 +123,6 @@ module.exports = {
   setLastPull,
   setLicence,
   readLicence,
+  setDevicePoste,
+  readDevicePoste,
 };

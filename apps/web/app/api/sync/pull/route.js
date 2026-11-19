@@ -45,6 +45,7 @@ export async function POST(req) {
   const lic = await pool.query(`SELECT etat FROM licences WHERE restaurant_id=$1`, [device.restaurantId]);
 
   return json({
+    poste: device.poste,
     categories: cats.rows,
     articles: arts.rows.map((a) => ({ ...a, prix_ttc: Number(a.prix_ttc), taux_tva: Number(a.taux_tva) })),
     users: staff.rows.map((u) => ({ matricule: u.matricule, nom: u.nom, role: u.role, pinHash: u.pin_hash, actif: u.actif, version: u.version })),

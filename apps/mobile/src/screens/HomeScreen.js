@@ -12,7 +12,7 @@ import { formatSyncDate } from "../core/reference";
 // commande arrive avec M5 (cette carte en est la source).
 export default function HomeScreen({
   enrollment, schema, user, reference, syncBusy, syncError, onSync,
-  onReset, onLock, onActivity, appVersion,
+  onReset, onLock, onActivity, appVersion, onNewOrder,
 }) {
   function confirmReset() {
     Alert.alert(
@@ -69,6 +69,24 @@ export default function HomeScreen({
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
+        <View style={styles.hero}>
+          <View style={styles.heroText}>
+            <Text style={styles.heroTitle}>Prise de commande</Text>
+            <Text style={styles.heroSub}>
+              Plan de salle, comptoir et envoi en cuisine journalisé. La carte locale
+              fonctionne sans réseau.
+            </Text>
+          </View>
+          <Pressable
+            onPress={onNewOrder}
+            disabled={empty}
+            style={({ pressed }) => [styles.heroButton, pressed && styles.heroButtonPressed, empty && styles.buttonDisabled]}
+            testID="new-order"
+          >
+            <Text style={styles.heroButtonText}>Prendre une commande</Text>
+          </Pressable>
+        </View>
+
         <View style={styles.grid}>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Cette tablette</Text>
@@ -211,6 +229,31 @@ const styles = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 4 },
   pillText: { fontSize: 12, fontWeight: "700" },
   scroll: { padding: space(6), gap: space(5) },
+  hero: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space(4),
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: space(5),
+  },
+  heroText: { flexShrink: 1, minWidth: 260 },
+  heroTitle: { ...font.h2 },
+  heroSub: { ...font.small, marginTop: space(1), lineHeight: 17, maxWidth: 520 },
+  heroButton: {
+    height: 46,
+    paddingHorizontal: space(6),
+    borderRadius: radius.md,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heroButtonPressed: { backgroundColor: colors.primaryPressed },
+  heroButtonText: { fontSize: 15, fontWeight: "700", color: "#FFFFFF" },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: space(5) },
   card: {
     flexGrow: 1,

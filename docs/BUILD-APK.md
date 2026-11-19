@@ -150,3 +150,4 @@ Sortie : `output/apk/caisseflow-<version>-release.apk` (bind-mount hôte, UID 10
 | 0.7.0 | 5 | `a384984` | authentification locale PIN (bcryptjs), cache du personnel, verrouillage de session ; `metro.config.js` mappe `crypto` (absent de RN) vers un substitut explicite |
 | 0.8.0 | 6 | `e7fe576` | données de référence locales : migration 4 (catégories, articles en centimes, tables), synchronisation delta des articles, carte locale hors ligne sur l'accueil |
 | 0.8.1 | 7 | `99b6d7d` | HTTP en clair autorisé en release (`plugins/withCleartextTraffic.js`) : sans lui, l'APK ne peut pas joindre un back-office local en `http://` |
+| 0.9.0 | 8 | (M5) | prise de commande : plan de salle, panier à prix figés, envoi en cuisine journalisé (VENTE), compléments et occupation des tables |
