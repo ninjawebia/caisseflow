@@ -149,4 +149,4 @@ Sortie : `output/apk/caisseflow-<version>-release.apk` (bind-mount hôte, UID 10
 | 0.6.0 | 4 | `dd7ffaa` | journal fiscal local : triggers append-only, chaînage SHA-256, garde d'horloge, vérification au démarrage ; `expo-crypto` ajouté (UUID + aléa) |
 | 0.7.0 | 5 | `a384984` | authentification locale PIN (bcryptjs), cache du personnel, verrouillage de session ; `metro.config.js` mappe `crypto` (absent de RN) vers un substitut explicite |
 | 0.8.0 | 6 | `e7fe576` | données de référence locales : migration 4 (catégories, articles en centimes, tables), synchronisation delta des articles, carte locale hors ligne sur l'accueil |
-| 0.8.1 | 7 | (correctif) | HTTP en clair autorisé en release (`plugins/withCleartextTraffic.js`) : sans lui, l'APK ne peut pas joindre un back-office local en `http://` |
+| 0.8.1 | 7 | `99b6d7d` | HTTP en clair autorisé en release (`plugins/withCleartextTraffic.js`) : sans lui, l'APK ne peut pas joindre un back-office local en `http://` |
