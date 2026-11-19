@@ -217,4 +217,4 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | Tests | mobile **135/135 PASS** (dont 19 nouveaux : 12 logique pure + 7 sur vraie base SQLite) ; web **107/107 PASS** (nouveau TC-M5-SYNC-001 sur `poste`) ; total **242 PASS / 0 FAIL** ; `make smoke` PASS |
 | APK | `output/apk/caisseflow-0.9.0-release.apk` — **versionName 0.9.0, versionCode 8** (`aapt2`), `usesCleartextTraffic=true` (HTTP LAN), bundle contenant `Prise de commande`, `Envoyer en cuisine`, `idx_commandes_table_active` et le garde-fou de poste (UTF-16 Hermes). Ancien APK 0.8.1 retiré. |
 | Écart PRD | aucun (PRD 4.1.2 / POS-1..3). Transfert de table, annulation de ligne envoyée avec motif + second, KDS et encaissement restent aux modules suivants (M6–M9). |
-| Commit | (à remplir) |
+| Commit | `50ddcf0` (poussé) |
