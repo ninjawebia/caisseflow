@@ -290,3 +290,4 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | Fallback | Aucune interface détectée → `http://<IP-LAN>:3000` (pas de valeur inventée). Testé en forçant `LAN_IP=10.255.255.1` : message d'injoignabilité correct. |
 | Doc | `README.md` : section « Tablette caisse (réseau local) » — adresse DHCP, relancer `make info` avant ré-enrôlement. |
 | Portée | Aucun changement d'application ni de données ; cible Make + documentation. |
+| Commit | `979417d` (poussé) |
