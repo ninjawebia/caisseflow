@@ -218,3 +218,14 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | APK | `output/apk/caisseflow-0.9.0-release.apk` — **versionName 0.9.0, versionCode 8** (`aapt2`), `usesCleartextTraffic=true` (HTTP LAN), bundle contenant `Prise de commande`, `Envoyer en cuisine`, `idx_commandes_table_active` et le garde-fou de poste (UTF-16 Hermes). Ancien APK 0.8.1 retiré. |
 | Écart PRD | aucun (PRD 4.1.2 / POS-1..3). Transfert de table, annulation de ligne envoyée avec motif + second, KDS et encaissement restent aux modules suivants (M6–M9). |
 | Commit | `50ddcf0` (poussé) |
+
+## Correctif — téléchargement des exports fiscaux (2026-11-21)
+
+| Élément | Résultat |
+| --- | --- |
+| Symptôme | Compte comptable, téléchargement d'un export journal : `410 {"error":"Fichier d'export indisponible"}` alors que le fichier existait sur l'hôte. |
+| Cause | Deux chemins divergents : `POST /api/exports` écrivait dans `output/exports` (bind-mount hôte), `GET /api/exports/[id]` lisait `apps/web/var/exports`. |
+| Correctif | `apps/web/lib/exports.js` = source unique (`EXPORT_DIR` surchargeable) utilisée par la génération ET le téléchargement ; résolution par basename dans ce répertoire (pas de traversée). Un identifiant UUID mal formé renvoie **404** au lieu d'un 500 PostgreSQL. |
+| Régression | nouvelle batterie `TC-EXP` 10/10 PASS (génération, HTTP 200, MIME, disposition, empreinte SHA-256 recalculée, droits auditeur/admin, 404 inconnu et UUID invalide). Rerun-safe : fichier + ligne de test supprimés, `audit_log` conservé. |
+| Vérification | web **117/117 PASS**, mobile **135/135 PASS**, total **252 PASS / 0 FAIL** ; contrôle manuel de l'export signalé (`95c0d4fc-…`) : HTTP 200, 6 771 octets, empreinte présente. |
+| Commit | (à remplir) |

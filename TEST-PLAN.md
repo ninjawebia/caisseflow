@@ -763,3 +763,29 @@ Batterie **rerun-safe** : poste dédié `POSTE-77`, jeton aléatoire à chaque r
 | TC-M5-SYNC-001 | Serveur local | `POST /api/sync/pull` avec le jeton dédié POSTE-78 | Le pull expose `poste: "POSTE-78"` (préfixe fiscal persisté par la caisse) | PASS |
 
 **Exécution du 2026-11-19** : mobile **135/135 PASS** (`make test-mobile`, image mobile, `node:sqlite` inclus) ; web **107/107 PASS**. Total projet **242 PASS / 0 FAIL** ; `make smoke` PASS ; APK `0.9.0` (versionCode 8) vérifié.
+
+## 32. Génération et téléchargement des exports — TC-EXP (BO-5, correctif 2026-11-21)
+
+> **Régression constatée** : connecté en comptable, le téléchargement d'un
+> export journal répondait `410 {"error":"Fichier d'export indisponible"}`.
+> Cause : la génération écrivait dans `output/exports` (bind-mount hôte) alors
+> que le téléchargement lisait `apps/web/var/exports` — deux chemins divergents.
+> Correctif : `lib/exports.js` devient la **source unique** du répertoire
+> (`EXPORT_DIR` surchargeable), utilisé par le POST et le GET ; le nom de
+> fichier reste réduit à son basename et résolu dans ce répertoire. Un
+> identifiant mal formé renvoie désormais **404** (et non un 500 PostgreSQL).
+
+| ID | Précondition | Action | Attendu | Statut |
+| --- | --- | --- | --- | --- |
+| TC-EXP-001 | Comptable connecté | `POST /api/exports` journal/CSV | HTTP 201 + `export.id` | PASS |
+| TC-EXP-002 | Export généré | `GET /api/exports/:id` | HTTP 200 (plus de 410), fichier servi | PASS |
+| TC-EXP-003 | — | En-tête de réponse | `Content-Type: text/csv; charset=utf-8` | PASS |
+| TC-EXP-004 | — | En-tête de réponse | `Content-Disposition: attachment; filename="…csv"` | PASS |
+| TC-EXP-005 | — | Recalcul SHA-256 du payload (hors ligne `EMPREINTE_SHA256`) | Empreinte identique au pied de fichier | PASS |
+| TC-EXP-006 | — | Contenu CSV | En-tête `ref;type;timestamp` et lignes du journal | PASS |
+| TC-EXP-007 | Auditeur connecté | Téléchargement du même export | HTTP 200 (lecture autorisée) | PASS |
+| TC-EXP-008 | Admin plateforme | Téléchargement | HTTP 403 (aucun restaurant) | PASS |
+| TC-EXP-009 | Gérant connecté | Export UUID inexistant | HTTP 404 | PASS |
+| TC-EXP-010 | Gérant connecté | `GET /api/exports/pas-un-uuid` | HTTP 404, jamais 500 SQL | PASS |
+
+**Exécution du 2026-11-21** : web **117/117 PASS** (dont TC-EXP 10/10) ; mobile **135/135** ; total **252 PASS / 0 FAIL**. Contrôle manuel : l'export comptable `95c0d4fc-…` téléchargé en HTTP 200 (6 771 octets, empreinte présente). `TC-EXP` est rerun-safe : fichier et ligne d'export de test supprimés en fin de passage, trace conservée dans `audit_log`.

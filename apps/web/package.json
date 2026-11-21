@@ -9,7 +9,7 @@
     "db:up": "docker compose up -d db",
     "db:migrate": "node db/migrate.js",
     "db:seed": "node db/seed.js",
-    "test": "node tests/chain-check.js && node tests/fiscal-chain.js && node tests/backlog-features.js && node tests/licence-features.js && node tests/media-features.js && node tests/device-features.js"
+    "test": "node tests/chain-check.js && node tests/fiscal-chain.js && node tests/backlog-features.js && node tests/licence-features.js && node tests/media-features.js && node tests/device-features.js && node tests/exports-features.js"
   },
   "dependencies": {
     "bcryptjs": "3.0.2",

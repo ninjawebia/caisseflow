@@ -3,12 +3,13 @@ import { getSessionUser, can } from "../../../lib/auth";
 import { pool } from "../../../lib/db";
 import { assertSameOrigin, json, audit } from "../../../lib/http";
 import { sha256hex } from "../../../lib/fiscal";
+import { EXPORT_DIR } from "../../../lib/exports";
 import fs from "fs";
 import path from "path";
 
 // Exports fiscaux écrits sur l'hôte (bind-mount ./output/exports, UID 1000),
-// surchargeable par EXPORT_DIR (prod : volume dédié). cwd = /repo/apps/web.
-const EXPORT_DIR = process.env.EXPORT_DIR || path.resolve(process.cwd(), "..", "..", "output", "exports");
+// surchargeable par EXPORT_DIR (prod : volume dédié). Le téléchargement lit le
+// MÊME répertoire via lib/exports.js (source unique de vérité).
 
 function csvEscape(v) {
   const s = v === null || v === undefined ? "" : String(v);
