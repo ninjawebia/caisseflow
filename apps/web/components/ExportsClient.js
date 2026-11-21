@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { formatDateTime } from "../lib/format";
 
 // S-08 — Exports (BO-5, A10 §18-19). The requester (demandeur) is recorded for
 // every export; each file carries a SHA-256 fingerprint (empreinte) that the
@@ -111,7 +112,7 @@ export default function ExportsClient({ initial }) {
                 <tbody>
                   {items.map((x) => (
                     <tr key={x.id} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
-                      <td className="py-2 pr-4 text-slate-500 text-xs">{new Date(x.created_at).toLocaleString("fr-FR")}</td>
+                      <td className="py-2 pr-4 text-slate-500 text-xs">{formatDateTime(x.created_at)}</td>
                       <td className="py-2 pr-4">{x.type}</td>
                       <td className="py-2 pr-4 font-mono uppercase">{x.format}</td>
                       <td className="py-2 pr-4 text-xs text-slate-500">{x.from_period || "…"} → {x.to_period || "…"}</td>

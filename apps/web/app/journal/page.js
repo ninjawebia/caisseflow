@@ -3,6 +3,7 @@ import { pageContext, LoginRequired } from "../../lib/pages";
 import { Shell } from "../../components/Shell";
 import { Card, PageHeader, StatusPill, EmptyState } from "../../components/ui";
 import { verifyChainsByPoste } from "../../lib/fiscal";
+import { formatDateTime } from "../../lib/format";
 
 // S-07 — Replica journal, read-only (BO-6). Full SHA-256 chain verification on
 // every load (FISC-7): any broken link is displayed as a blocking incident.
@@ -89,7 +90,7 @@ export default async function JournalPage({ searchParams }) {
                   <tr key={e.id} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
                     <td className="py-2 pr-4 font-mono text-xs">{e.ref}</td>
                     <td className="py-2 pr-4"><StatusPill tone={e.type === "ANNULATION" ? "danger" : e.type === "CLOTURE_Z" ? "warning" : "neutral"}>{e.type}</StatusPill></td>
-                    <td className="py-2 pr-4 text-slate-500 text-xs">{new Date(e.timestamp).toLocaleString("fr-FR")}</td>
+                    <td className="py-2 pr-4 text-slate-500 text-xs">{formatDateTime(e.timestamp)}</td>
                     <td className="py-2 pr-4 font-mono text-xs">{e.user_matricule}{e.validator_matricule ? ` + ${e.validator_matricule}` : ""}</td>
                     <td className="py-2 pr-4 text-xs text-slate-500 max-w-40 truncate" title={e.motif || ""}>{e.motif || "—"}</td>
                     <td className="py-2 pr-4 text-right font-mono tabular-nums">{e.amount !== null ? Number(e.amount).toFixed(2) + " €" : "—"}</td>

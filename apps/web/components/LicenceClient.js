@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { formatDateTime } from "../lib/format";
 
 // Licence management (S-09, LIC-1..4). Reading is open to all staff; only the
 // platform admin changes the state and ONLY the gérant activates a licence KEY
@@ -78,9 +79,9 @@ export default function LicenceClient({ etat, isAdmin, phases, canActivate, lice
         {phases && (phases.grace1At || phases.grace2At || phases.bloqueAt || phases.impayeeDepuis) && (
           <dl className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-slate-600">
             <div><dt className="font-medium text-slate-500">Impayée depuis</dt><dd className="font-mono">{phases.impayeeDepuis || "—"}</dd></div>
-            <div><dt className="font-medium text-slate-500">Rappel (grace1) à</dt><dd className="font-mono">{phases.grace1At ? new Date(phases.grace1At).toLocaleString("fr-FR") : "—"}</dd></div>
-            <div><dt className="font-medium text-slate-500">Cloud suspendu (grace2) à</dt><dd className="font-mono">{phases.grace2At ? new Date(phases.grace2At).toLocaleString("fr-FR") : "—"}</dd></div>
-            <div><dt className="font-medium text-slate-500">Blocage (J+90) à</dt><dd className="font-mono">{phases.bloqueAt ? new Date(phases.bloqueAt).toLocaleString("fr-FR") : "—"}</dd></div>
+            <div><dt className="font-medium text-slate-500">Rappel (grace1) à</dt><dd className="font-mono">{formatDateTime(phases.grace1At)}</dd></div>
+            <div><dt className="font-medium text-slate-500">Cloud suspendu (grace2) à</dt><dd className="font-mono">{formatDateTime(phases.grace2At)}</dd></div>
+            <div><dt className="font-medium text-slate-500">Blocage (J+90) à</dt><dd className="font-mono">{formatDateTime(phases.bloqueAt)}</dd></div>
           </dl>
         )}
       </div>

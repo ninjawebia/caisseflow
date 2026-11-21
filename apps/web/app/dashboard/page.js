@@ -2,6 +2,7 @@ import { pool } from "../../lib/db";
 import { pageContext, LoginRequired } from "../../lib/pages";
 import { Shell } from "../../components/Shell";
 import { Card, KpiCard, PageHeader, StatusPill, EmptyState, ErrorBanner } from "../../components/ui";
+import { formatDateTime } from "../../lib/format";
 
 // S-02 — Dashboard (PRD 12.4). KPIs from the cloud replica; every widget defines
 // loading (skeleton via streaming), empty (no sales yet) and error states.
@@ -98,7 +99,7 @@ export default async function Dashboard() {
                     <tr key={e.id} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
                       <td className="py-2 pr-4 font-mono text-xs">{e.ref}</td>
                       <td className="py-2 pr-4"><StatusPill tone={e.type === "ANNULATION" ? "danger" : e.type === "CLOTURE_Z" ? "warning" : "neutral"}>{e.type}</StatusPill></td>
-                      <td className="py-2 pr-4 text-slate-500 text-xs">{new Date(e.timestamp).toLocaleString("fr-FR")}</td>
+                      <td className="py-2 pr-4 text-slate-500 text-xs">{formatDateTime(e.timestamp)}</td>
                       <td className="py-2 pr-4">{e.user_matricule}</td>
                       <td className="py-2 pr-4 text-right font-mono tabular-nums">{e.amount !== null ? fmt(e.amount) + " €" : "—"}</td>
                       <td className="py-2 text-center"><span className={`inline-block w-1.5 h-1.5 rounded-full ${e.chainOk ? "bg-emerald-500" : "bg-rose-500"}`} aria-label={e.chainOk ? "Chaînage vérifié" : "Rupture"} /></td>

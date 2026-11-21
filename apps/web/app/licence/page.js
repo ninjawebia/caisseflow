@@ -3,6 +3,7 @@ import { pageContext, LoginRequired } from "../../lib/pages";
 import { Shell } from "../../components/Shell";
 import { PageHeader, StatusPill } from "../../components/ui";
 import LicenceClient from "../../components/LicenceClient";
+import { formatDate } from "../../lib/format";
 
 // S-09 — Licence (LIC-1..4). State pill + lifecycle; mutations admin-only.
 export default async function LicencePage() {
@@ -32,7 +33,7 @@ export default async function LicencePage() {
   const licenceInfo = {
     etat: row.etat || "active",
     plan: row.plan || null,
-    expires: row.expires_at ? new Date(row.expires_at).toLocaleDateString("fr-FR") : null,
+    expires: row.expires_at ? formatDate(row.expires_at) : null,
   };
 
   return (

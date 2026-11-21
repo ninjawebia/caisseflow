@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { formatDateTime } from "../lib/format";
 
 // Appareils (S-13) — enrôlement des tablettes caisse. Le jeton est généré côté
 // serveur (256 bits, stocké HASHÉ) et n'est affiché qu'UNE seule fois ici : il
@@ -188,7 +189,7 @@ export default function DevicesClient({ devices }) {
                     <tr key={d.id} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
                       <td className="py-2 pr-4 font-mono text-slate-900">{d.poste}</td>
                       <td className="py-2 pr-4 text-slate-500 tabular-nums">
-                        {new Date(d.created_at).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })}
+                        {formatDateTime(d.created_at)}
                       </td>
                       <td className="py-2 pr-4 text-center">
                         <span className={`text-xs font-medium ${d.a_synchronise ? "text-emerald-700" : "text-slate-400"}`}>

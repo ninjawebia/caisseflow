@@ -787,5 +787,8 @@ Batterie **rerun-safe** : poste dédié `POSTE-77`, jeton aléatoire à chaque r
 | TC-EXP-008 | Admin plateforme | Téléchargement | HTTP 403 (aucun restaurant) | PASS |
 | TC-EXP-009 | Gérant connecté | Export UUID inexistant | HTTP 404 | PASS |
 | TC-EXP-010 | Gérant connecté | `GET /api/exports/pas-un-uuid` | HTTP 404, jamais 500 SQL | PASS |
+| TC-EXP-011 | — | `formatDateTime("2026-11-21T00:38:04Z")` | `21/11/2026 01:38` (Europe/Paris, heure d'hiver) — identique serveur et navigateur | PASS |
+| TC-EXP-012 | — | Date d'été `2026-07-01T22:30:00Z` | `02/07/2026 00:30` et `formatDate` `02/07/2026` | PASS |
+| TC-EXP-013 | — | `null`, chaîne invalide | `—` (aucune date inventée) | PASS |
 
-**Exécution du 2026-11-21** : web **117/117 PASS** (dont TC-EXP 10/10) ; mobile **135/135** ; total **252 PASS / 0 FAIL**. Contrôle manuel : l'export comptable `95c0d4fc-…` téléchargé en HTTP 200 (6 771 octets, empreinte présente). `TC-EXP` est rerun-safe : fichier et ligne d'export de test supprimés en fin de passage, trace conservée dans `audit_log`.
+**Exécution du 2026-11-21** : web **120/120 PASS** (dont TC-EXP 13/13) ; mobile **135/135** ; total **255 PASS / 0 FAIL**. Contrôle manuel : l'export comptable `95c0d4fc-…` téléchargé en HTTP 200 (6 771 octets, empreinte présente). `TC-EXP` est rerun-safe : fichier et ligne d'export de test supprimés en fin de passage, trace conservée dans `audit_log`.

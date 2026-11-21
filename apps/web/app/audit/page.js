@@ -2,6 +2,7 @@ import { pool } from "../../lib/db";
 import { pageContext, LoginRequired } from "../../lib/pages";
 import { Shell } from "../../components/Shell";
 import { Card, PageHeader, EmptyState, StatusPill } from "../../components/ui";
+import { formatDateTime } from "../../lib/format";
 
 // S-10 — Audit trail, read-only (PRD 10.5, BO-7). Every back-office action
 // lands here; the table itself is append-only (UPDATE/DELETE blocked in SQL).
@@ -68,7 +69,7 @@ export default async function AuditPage({ searchParams }) {
               <tbody>
                 {rows.rows.map((e) => (
                   <tr key={e.id} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
-                    <td className="py-2 pr-4 text-slate-500 text-xs whitespace-nowrap">{new Date(e.timestamp).toLocaleString("fr-FR")}</td>
+                    <td className="py-2 pr-4 text-slate-500 text-xs whitespace-nowrap">{formatDateTime(e.timestamp)}</td>
                     <td className="py-2 pr-4 text-xs">{e.actor_email || "—"}</td>
                     <td className="py-2 pr-4"><StatusPill tone={toneFor(e.action)}>{e.action}</StatusPill></td>
                     <td className="py-2 pr-4 font-mono text-xs">{e.entity}{e.entity_id ? " #" + String(e.entity_id).slice(0, 8) : ""}</td>

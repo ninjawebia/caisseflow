@@ -7,6 +7,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const { pool } = require("../lib/db");
 const { EXPORT_DIR } = require("../lib/exports");
+const { formatDateTime, formatDate } = require("../lib/format");
 
 const B = "http://127.0.0.1:3000";
 let pass = 0, fail = 0;
@@ -73,6 +74,12 @@ async function main() {
   // Identifiant mal formé : 404, jamais un 500 SQL.
   const badId = await fetch(`${B}/api/exports/pas-un-uuid`, { headers: { Cookie: jarG } });
   check("TC-EXP-010", badId.status === 404, `uuid invalide → HTTP ${badId.status}`);
+
+  // Dates déterministes (régression hydratation) : même sortie quel que soit le
+  // fuseau du processus, été comme hiver.
+  check("TC-EXP-011", formatDateTime("2026-11-21T00:38:04.000Z") === "21/11/2026 01:38", formatDateTime("2026-11-21T00:38:04.000Z"));
+  check("TC-EXP-012", formatDateTime("2026-07-01T22:30:00.000Z") === "02/07/2026 00:30" && formatDate("2026-07-01T22:30:00.000Z") === "02/07/2026", "heure d'été Europe/Paris");
+  check("TC-EXP-013", formatDateTime(null) === "—" && formatDateTime("pas une date") === "—", "valeurs absentes/invalides");
 
   // Nettoyage : fichier + ligne de test (l'audit_log conserve la trace).
   const row = await pool.query("SELECT fichier FROM exports WHERE id=$1", [id]);

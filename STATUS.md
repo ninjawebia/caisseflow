@@ -229,3 +229,13 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | Régression | nouvelle batterie `TC-EXP` 10/10 PASS (génération, HTTP 200, MIME, disposition, empreinte SHA-256 recalculée, droits auditeur/admin, 404 inconnu et UUID invalide). Rerun-safe : fichier + ligne de test supprimés, `audit_log` conservé. |
 | Vérification | web **117/117 PASS**, mobile **135/135 PASS**, total **252 PASS / 0 FAIL** ; contrôle manuel de l'export signalé (`95c0d4fc-…`) : HTTP 200, 6 771 octets, empreinte présente. |
 | Commit | `f1e30f4` (poussé) |
+
+## Correctif — hydratation des dates du back-office (2026-11-21)
+
+| Élément | Résultat |
+| --- | --- |
+| Symptôme | Sur `/exports`, erreur React « Hydration failed » : date serveur `21/11/2026 00:38` contre `21/11/2026 01:38` côté navigateur. |
+| Cause | `new Date(...).toLocaleString("fr-FR")` dans des composants **client** : le serveur rend en UTC (conteneur) et le navigateur dans le fuseau local (Europe/Paris). La même divergence touchait `/appareils` et `/licence` (composants client). |
+| Correctif | `lib/format.js` : formatage déterministe `JJ/MM/AAAA HH:MM` en **Europe/Paris**, assemblé à partir des parties numériques (`Intl.formatToParts`), identique côté serveur et client. Appliqué aux composants client (`ExportsClient`, `DevicesClient`, `LicenceClient`) et aux pages serveur (`journal`, `dashboard`, `audit`, échéances de licence) pour un affichage cohérent. |
+| Vérification | TC-EXP-011..013 (hiver, été, valeurs invalides) ; rendu SSR contrôlé : `/exports` affiche `21/11/2026 01:38` pour `00:38Z`, plus de divergence. Web **120/120 PASS**, mobile **135/135**, total **255 PASS / 0 FAIL**. |
+| Commit | (à remplir) |
