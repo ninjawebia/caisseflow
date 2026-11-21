@@ -28,7 +28,7 @@ export default function ExportsClient({ initial }) {
       }
       setItems((prev) => [data.export, ...prev]);
       setMsg({ tone: "success", text: "Export généré — empreinte " + data.export.empreinte.slice(0, 12) + "… Téléchargement lancé." });
-      window.location.href = "/api/exports/" + data.export.id;
+      window.location.href = "/api/exports/" + data.export.id + "?v=2";
     } catch {
       setMsg({ tone: "danger", text: "Serveur indisponible — réessayez" });
     } finally {
@@ -118,7 +118,7 @@ export default function ExportsClient({ initial }) {
                       <td className="py-2 pr-4 text-xs text-slate-500">{x.from_period || "…"} → {x.to_period || "…"}</td>
                       <td className="py-2 pr-4 font-mono text-xs text-slate-400" title={x.empreinte}>{x.empreinte.slice(0, 10)}</td>
                       <td className="py-2 text-right">
-                        <a href={"/api/exports/" + x.id} data-action={"download-" + x.id}
+                        <a href={"/api/exports/" + x.id + "?v=2"} data-action={"download-" + x.id}
                           className="px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 rounded-lg transition-colors">Télécharger</a>
                       </td>
                     </tr>

@@ -81,6 +81,11 @@ async function main() {
   check("TC-EXP-012", formatDateTime("2026-07-01T22:30:00.000Z") === "02/07/2026 00:30" && formatDate("2026-07-01T22:30:00.000Z") === "02/07/2026", "heure d'été Europe/Paris");
   check("TC-EXP-013", formatDateTime(null) === "—" && formatDateTime("pas une date") === "—", "valeurs absentes/invalides");
 
+  // Cache : un 410/404 sans Cache-Control était mémorisé par le navigateur et
+  // continuait d'être servi après le correctif. Tout doit être no-store.
+  check("TC-EXP-014", /no-store/.test(dl.headers.get("cache-control") || ""), dl.headers.get("cache-control") || "sans cache-control");
+  check("TC-EXP-015", /no-store/.test(badId.headers.get("cache-control") || ""), badId.headers.get("cache-control") || "sans cache-control (erreur)");
+
   // Nettoyage : fichier + ligne de test (l'audit_log conserve la trace).
   const row = await pool.query("SELECT fichier FROM exports WHERE id=$1", [id]);
   if (row.rows[0]) {

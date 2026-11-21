@@ -239,3 +239,14 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | Correctif | `lib/format.js` : formatage déterministe `JJ/MM/AAAA HH:MM` en **Europe/Paris**, assemblé à partir des parties numériques (`Intl.formatToParts`), identique côté serveur et client. Appliqué aux composants client (`ExportsClient`, `DevicesClient`, `LicenceClient`) et aux pages serveur (`journal`, `dashboard`, `audit`, échéances de licence) pour un affichage cohérent. |
 | Vérification | TC-EXP-011..013 (hiver, été, valeurs invalides) ; rendu SSR contrôlé : `/exports` affiche `21/11/2026 01:38` pour `00:38Z`, plus de divergence. Web **120/120 PASS**, mobile **135/135**, total **255 PASS / 0 FAIL**. |
 | Commit | `7494ce4` (poussé) |
+
+## Correctif — cache navigateur des exports (2026-11-21)
+
+| Élément | Résultat |
+| --- | --- |
+| Symptôme | Après le premier correctif, un export existant renvoyait encore `410 {"error":"Fichier d'export indisponible"}` dans le navigateur, alors que `curl` recevait `200` (11 524 octets). |
+| Cause | La route de téléchargement n'envoyait aucun `Cache-Control`. Une réponse `410 Gone` est **cacheable heuristiquement** (RFC 9110) : le navigateur rejouait l'ancien 410 mis en cache avant le correctif. |
+| Correctif | `Cache-Control: private, no-store, max-age=0, must-revalidate` sur **toutes** les réponses (200, 403, 404, 410) via un helper `fail()` ; liens de téléchargement et redirection post-génération suffixés `?v=2` pour invalider les URL déjà en cache. |
+| Régression | `TC-EXP-014` (no-store sur 200) et `TC-EXP-015` (no-store sur erreur). `TC-EXP` **15/15 PASS** ; web **122/122**, mobile **135/135**, total **257 PASS / 0 FAIL**. |
+| Vérification | `GET /api/exports/45e745c0-…?v=2` → **200**, 11 524 octets, `Content-Disposition` JSON correct, `cache-control: private, no-store…` ; les 3 exports existants (csv/json) répondent 200. |
+| Commit | (à remplir) |
