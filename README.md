@@ -22,6 +22,12 @@ utilisateur **caisseflow**, mot de passe **caisseflow_dev** (port 5432 interne ;
 depuis l'hôte : `postgresql://caisseflow:caisseflow_dev@localhost:5433/caisseflow`).
 `make info` affiche ces accès. Identifiants de développement uniquement.
 
+**Tablette caisse (réseau local)** : `make info` affiche l'adresse LAN courante
+(`Réseau local : http://<IP>:3000`) et vérifie qu'elle répond (`api/health`).
+C'est cette adresse qu'il faut saisir sur la tablette (écran d'accueil, ligne
+« Serveur »). L'adresse vient d'un bail **DHCP** : elle peut changer au
+renouvellement — relancez `make info` avant de ré-enrôler une tablette.
+
 Vérification (depuis les conteneurs, pas depuis l'hôte) : `make smoke`
 (base + migrations + seed + chaînage SHA-256 + HTTP `api/health`).
 

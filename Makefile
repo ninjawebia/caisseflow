@@ -6,6 +6,15 @@
 COMPOSE   := docker compose
 COMPOSE_P := docker compose -f docker-compose.prod.yml
 
+# Adresse LAN courante (bail DHCP) affichée par `make info` : première IPv4
+# globale hors interfaces virtuelles (Docker, bridges, VPN). Recalculée à
+# chaque invocation — l'adresse change au renouvellement DHCP.
+LAN_IP := $(shell ip -4 -o addr show scope global 2>/dev/null | awk '$$2 !~ /^(docker|br-|veth|tun|tap|wg|tailscale|zt)/ {split($$4,a,"/"); print a[1]; exit}')
+ifeq ($(LAN_IP),)
+LAN_IP := $(shell command -v ipconfig >/dev/null 2>&1 && ipconfig getifaddr en0 2>/dev/null)
+endif
+LAN_IP_DISPLAY = $(if $(LAN_IP),$(LAN_IP),<IP-LAN>)
+
 .DEFAULT_GOAL := help
 .PHONY: help up up-all down restart ps logs stop-web clean build shell-web shell-postgres \
         shell-adminer shell-mailhog shell-mobile migrate seed test \
@@ -198,6 +207,14 @@ info:
 	@echo "================ CaisseFlow — POS restaurant conforme NF525 ================"
 	@echo "Application : CaisseFlow — back-office v0.1.0 · caisse mobile v0.9.0"
 	@echo "Web         : http://localhost:3000   (adminer :8081 · mailhog :8025)"
+	@echo "Réseau local : http://$(LAN_IP_DISPLAY):3000  ← adresse à saisir sur la tablette"
+	@if [ -n "$(LAN_IP)" ]; then \
+	  if curl -fsS --max-time 2 "http://$(LAN_IP):3000/api/health" >/dev/null 2>&1; then \
+	    echo "               (joignable depuis le réseau — health + base OK)"; \
+	  else \
+	    echo "               (injoignable pour l'instant — conteneurs arrêtés ? 'make up')"; \
+	  fi; \
+	fi
 	@echo "Base        : service compose 'postgres' — réseau caisseflow-net (5433 exposé)"
 	@echo ""
 	@echo "Adminer     : http://localhost:8081  (interface SQL, pas d'authentification propre)"
@@ -215,7 +232,8 @@ info:
 	@echo "              auditeur@local.test/Audit123! · admin@local.test/Admin123!"
 	@echo ""
 	@echo "Caisse mobile (tablette Android) :"
-	@echo "  Serveur    : http://<IP-LAN>:3000  (ex. http://192.168.1.129:3000)"
+	@echo "  Serveur    : http://$(LAN_IP_DISPLAY):3000  (voir « Réseau local » ci-dessus)"
+	@echo "               ⚠ adresse DHCP : revérifiez 'make info' si elle a changé"
 	@echo "  Jeton      : Back-office → Appareils → créer POSTE-01 (affiché UNE fois)"
 	@echo "               le jeton démo device-token-demo-POSTE-01 est révoqué"
 	@echo "  Connexion  : matricule + PIN — serveur (S07 / 3456 en démo)"

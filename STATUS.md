@@ -279,3 +279,14 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | Vérification | Purge du volume `.next` + `make up` + `make migrate`, puis **deux passages** : web **156/156 PASS**, mobile **135/135**, total **291 PASS / 0 FAIL**. |
 | Écart PRD | aucun sur l'existant ; évolution d'affichage documentée au backlog PRD (§ 14.5), sans changement de données ni de droits RBAC. |
 | Commit | `948e969` (poussé) |
+
+## `make info` — adresse LAN courante (2026-11-22)
+
+| Élément | Résultat |
+| --- | --- |
+| Problème | L'adresse du serveur était figée dans la doc (`ex. http://192.168.1.129:3000`) alors qu'elle est attribuée en **DHCP** : elle a changé deux fois pendant la session (`192.168.11.221` → `10.250.128.17`), d'où « Serveur injoignable » sur la tablette. |
+| Correctif | `make info` calcule l'adresse LAN à chaque invocation (première IPv4 globale hors Docker/bridges/VPN, repli macOS `ipconfig en0`), l'affiche comme **ligne « Réseau local »** et la réutilise dans la section caisse mobile. |
+| Vérification en direct | `curl http://<IP>:3000/api/health` exécuté par la cible : affiche « joignable depuis le réseau — health + base OK », ou « injoignable — conteneurs arrêtés ? 'make up' ». |
+| Fallback | Aucune interface détectée → `http://<IP-LAN>:3000` (pas de valeur inventée). Testé en forçant `LAN_IP=10.255.255.1` : message d'injoignabilité correct. |
+| Doc | `README.md` : section « Tablette caisse (réseau local) » — adresse DHCP, relancer `make info` avant ré-enrôlement. |
+| Portée | Aucun changement d'application ni de données ; cible Make + documentation. |
