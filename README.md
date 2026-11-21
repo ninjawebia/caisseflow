@@ -17,6 +17,11 @@ make seed      # données de démo déterministes (PIN 1234/2345/3456/4567 — J
 
 → Application : **http://localhost:3000** · Adminer : http://localhost:8081 · MailHog : http://localhost:8025
 
+Adminer (dev) : système **PostgreSQL**, serveur **postgres**, base **caisseflow**,
+utilisateur **caisseflow**, mot de passe **caisseflow_dev** (port 5432 interne ;
+depuis l'hôte : `postgresql://caisseflow:caisseflow_dev@localhost:5433/caisseflow`).
+`make info` affiche ces accès. Identifiants de développement uniquement.
+
 Vérification (depuis les conteneurs, pas depuis l'hôte) : `make smoke`
 (base + migrations + seed + chaînage SHA-256 + HTTP `api/health`).
 
