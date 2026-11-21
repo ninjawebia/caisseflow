@@ -278,3 +278,4 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | Régression | `TC-PAG` **15 cas** (`apps/web/tests/pagination.js`) : calculs purs, liens avec filtres, pages 1/2/999/invalide, journal filtré, audit, menu SSR (20 lignes), total des exports, rapports. En lecture seule → rerun-safe. |
 | Vérification | Purge du volume `.next` + `make up` + `make migrate`, puis **deux passages** : web **156/156 PASS**, mobile **135/135**, total **291 PASS / 0 FAIL**. |
 | Écart PRD | aucun sur l'existant ; évolution d'affichage documentée au backlog PRD (§ 14.5), sans changement de données ni de droits RBAC. |
+| Commit | `948e969` (poussé) |
