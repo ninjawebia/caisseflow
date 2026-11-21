@@ -228,4 +228,4 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | Correctif | `apps/web/lib/exports.js` = source unique (`EXPORT_DIR` surchargeable) utilisée par la génération ET le téléchargement ; résolution par basename dans ce répertoire (pas de traversée). Un identifiant UUID mal formé renvoie **404** au lieu d'un 500 PostgreSQL. |
 | Régression | nouvelle batterie `TC-EXP` 10/10 PASS (génération, HTTP 200, MIME, disposition, empreinte SHA-256 recalculée, droits auditeur/admin, 404 inconnu et UUID invalide). Rerun-safe : fichier + ligne de test supprimés, `audit_log` conservé. |
 | Vérification | web **117/117 PASS**, mobile **135/135 PASS**, total **252 PASS / 0 FAIL** ; contrôle manuel de l'export signalé (`95c0d4fc-…`) : HTTP 200, 6 771 octets, empreinte présente. |
-| Commit | (à remplir) |
+| Commit | `f1e30f4` (poussé) |
