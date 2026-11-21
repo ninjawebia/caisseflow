@@ -4,6 +4,7 @@ import { pool } from "../../../../lib/db";
 import { assertSameOrigin, json, audit } from "../../../../lib/http";
 import { licenceGate } from "../../../../lib/license";
 import { archive } from "../../../../lib/uploads";
+import { isUuid } from "../../../../lib/validate";
 
 // DELETE /api/media/[id] — suppression d'un asset de la bibliothèque (gérant
 // only, gate licence). REFUSÉ (400) si au moins un article utilise le contenu
@@ -17,6 +18,7 @@ export async function DELETE(req, ctx) {
   if (!user || !can(user.role, "menu") || !user.restaurantId) return json({ error: "Accès refusé" }, 403);
   const lic = await licenceGate(user.restaurantId);
   if (!lic.ok) return json({ error: lic.error }, 403);
+  if (!isUuid(id)) return json({ error: "Média introuvable" }, 404);
 
   const m = await pool.query(
     "SELECT file, hash FROM media WHERE id = $1 AND restaurant_id = $2",

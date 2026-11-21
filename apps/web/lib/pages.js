@@ -33,8 +33,4 @@ export async function pageContext(permission) {
   return { user, licence, denied };
 }
 
-export function Forbidden() {
-  return <LoginRequired note="403" />;
-}
-
 export { LoginRequired };

@@ -4,6 +4,7 @@ import { pool } from "../../../../../lib/db";
 import { json } from "../../../../../lib/http";
 import fs from "fs";
 import { detectImage, ALLOWED, pathOf } from "../../../../../lib/uploads";
+import { isUuid } from "../../../../../lib/validate";
 
 // GET /api/media/[id]/photo — sert le fichier de la bibliothèque (vignettes du
 // sélecteur, réutilisation). ETag = 16 premiers caractères du hash (304).
@@ -12,6 +13,7 @@ export async function GET(req, ctx) {
   const { id } = await ctx.params;
   const user = await getSessionUser(await cookies());
   if (!user || !user.restaurantId) return json({ error: "Accès refusé" }, 403);
+  if (!isUuid(id)) return json({ error: "Média introuvable" }, 404);
 
   const r = await pool.query(
     "SELECT file, hash FROM media WHERE id = $1 AND restaurant_id = $2",

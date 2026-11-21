@@ -1,7 +1,7 @@
 import { deviceAuth, syncAllowed } from "../../../../lib/device";
 import { pool } from "../../../../lib/db";
 import { json } from "../../../../lib/http";
-import { verifyChain, nextHash } from "../../../../lib/fiscal";
+import { nextHash } from "../../../../lib/fiscal";
 
 // POST /api/sync/push — append-only replication of the local fiscal journal
 // (PRD 7.3 SYNC-1/2, 9.2 endpoint 1). Idempotent on (restaurant_id, uuid_op):

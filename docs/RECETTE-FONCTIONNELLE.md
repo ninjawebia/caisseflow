@@ -3,7 +3,7 @@
 > État au **20/11/2026** : back-office v0.4 + caisse mobile **M0→M5**.
 > Ce document décrit ce qui est réellement utilisable aujourd'hui et fournit le
 > plan de recette manuelle (tablette + back-office). Les preuves automatisées
-> sont dans `TEST-PLAN.md` (§ 21–32) : **257 PASS / 0 FAIL**.
+> sont dans `TEST-PLAN.md` (§ 21–33) : **276 PASS / 0 FAIL**.
 
 ## 1. Ce qui a été développé
 
@@ -39,7 +39,7 @@
 
 - Gate sécurité v0.4 : **0 FAIL**, artefacts `security/`.
 - QA : `qa-check.sh` 0 FAIL / 0 WARN.
-- Automatisé : mobile **135/135**, web **122/122**, soit **257 PASS / 0 FAIL**.
+- Automatisé : mobile **135/135**, web **141/141**, soit **276 PASS / 0 FAIL** (deux passages consécutifs).
 - 100 % conteneurisé : aucun `node`/`npm` sur l'hôte, tout passe par `make`.
 
 ### Pas encore livré (ne pas tester comme acquis)

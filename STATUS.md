@@ -250,3 +250,16 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | Régression | `TC-EXP-014` (no-store sur 200) et `TC-EXP-015` (no-store sur erreur). `TC-EXP` **15/15 PASS** ; web **122/122**, mobile **135/135**, total **257 PASS / 0 FAIL**. |
 | Vérification | `GET /api/exports/45e745c0-…?v=2` → **200**, 11 524 octets, `Content-Disposition` JSON correct, `cache-control: private, no-store…` ; les 3 exports existants (csv/json) répondent 200. |
 | Commit | `8b369a2` (poussé) |
+
+## Audit clean-code — validation des entrées et code mort (2026-11-21)
+
+| Élément | Résultat |
+| --- | --- |
+| Audit | Relecture du code web et mobile contre `SKILL-CODE.md` : diffs ciblés, zéro code mort, source unique, déterminisme des dates, gestion des entrées. |
+| Violations trouvées | **13 méthodes API** renvoyaient **500** sur un identifiant mal formé (`invalid input syntax for type uuid`) : articles (PATCH/DELETE + photo GET/POST/PATCH/DELETE), catégories (PATCH/DELETE), appareils, tables, comptes web, matricules mobiles, médias (DELETE + photo), exports. `POST /api/sync/pull?since=pas-une-date` renvoyait **500** (`invalid input syntax for type timestamp`). Enfin : 3 imports inutilisés, 3 symboles morts. |
+| Correctif | `apps/web/lib/validate.js` : `isUuid` = **source unique** de validation, branchée sur les 13 méthodes (404 explicite). `sync/pull` : date `since` invalide → **400**. `exports/[id]` : regex locale remplacée par `isUuid` (déduplication). |
+| Code mort retiré | `loadArticle` (route photo article — retournait toujours `article: null`, jamais appelé), `Forbidden` (`lib/pages.js`, jamais importé), export `TIME_ZONE` (`lib/format.js`). Imports retirés : `getSessionUser` (login), `verifyChain` (sync/push), `syncAllowed` (sync/pull). |
+| Régression attrapée | Le retrait de `syncAllowed` dans `sync/push` cassait 1 cas (`TC-DEV-017`, 500). Détecté par `make test`, import restauré ; 2ᵉ passage vert. Preuve que la batterie couvre bien ce chemin. |
+| Régression ajoutée | `TC-VAL` **19 cas** (`apps/web/tests/api-validation.js`), intégrée à `npm test` : 15 identifiants mal formés, UUID inconnu, `since` invalide et valide. Rerun-safe (poste `POSTE-76` supprimé en fin de passage). |
+| Vérification | Purge du volume `.next` + `make up` + `make migrate` puis **deux passages** complets : web **141/141 PASS**, mobile **135/135**, total **276 PASS / 0 FAIL**. |
+| Écart PRD | aucun (qualité interne, aucun changement de comportement fonctionnel). |

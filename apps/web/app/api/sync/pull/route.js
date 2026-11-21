@@ -1,4 +1,4 @@
-import { deviceAuth, syncAllowed } from "../../../../lib/device";
+import { deviceAuth } from "../../../../lib/device";
 import { licenceGate } from "../../../../lib/license";
 import { pool } from "../../../../lib/db";
 import { json } from "../../../../lib/http";
@@ -19,6 +19,11 @@ export async function POST(req) {
   // fiscal entries is what grace2 suspends — reference pull remains minimal.
   const since = new URL(req.url).searchParams.get("since");
   const sinceDate = since ? new Date(since) : new Date(0);
+  // Une date invalide doit être refusée explicitement (sinon PostgreSQL lève
+  // `invalid input syntax for type timestamp` -> 500).
+  if (Number.isNaN(sinceDate.getTime())) {
+    return json({ error: "Paramètre since invalide (date ISO 8601 attendue)" }, 400);
+  }
 
   const cats = await pool.query(
     // `actif` est transmis explicitement, mais le pull ne contient que les

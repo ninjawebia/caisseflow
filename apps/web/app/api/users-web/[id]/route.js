@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { getSessionUser, can } from "../../../../lib/auth";
 import { pool } from "../../../../lib/db";
 import { assertSameOrigin, json, audit } from "../../../../lib/http";
+import { isUuid } from "../../../../lib/validate";
 
 // PATCH /api/users-web/[id] — enable/disable a back-office account (BO-2).
 export async function PATCH(req, ctx) {
@@ -10,6 +11,7 @@ export async function PATCH(req, ctx) {
   const user = await getSessionUser(await cookies());
   if (!user || !can(user.role, "users")) return json({ error: "Accès refusé" }, 403);
   const id = (await ctx.params).id;
+  if (!isUuid(id)) return json({ error: "Compte introuvable" }, 404);
   const body = await req.json().catch(() => null);
   const actif = body?.actif === true;
 

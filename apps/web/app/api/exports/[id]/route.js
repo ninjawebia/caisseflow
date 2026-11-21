@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { getSessionUser, can } from "../../../../lib/auth";
 import { pool } from "../../../../lib/db";
 import { exportFilePath } from "../../../../lib/exports";
+import { isUuid } from "../../../../lib/validate";
 import fs from "fs";
 import path from "path";
 
@@ -22,7 +23,7 @@ export async function GET(req, ctx) {
   const id = (await ctx.params).id;
   // Un identifiant mal formé ne doit jamais produire un 500 PostgreSQL
   // (`invalid input syntax for type uuid`) : il est traité comme introuvable.
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+  if (!isUuid(id)) {
     return fail("Export introuvable", 404);
   }
 

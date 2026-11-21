@@ -4,6 +4,7 @@ import { pool } from "../../../../lib/db";
 import { assertSameOrigin, json, audit } from "../../../../lib/http";
 import { licenceGate } from "../../../../lib/license";
 import { validateArticle } from "@caisseflow/shared";
+import { isUuid } from "../../../../lib/validate";
 
 // PATCH /api/articles/[id] — update (price change creates a new version, BO-1).
 export async function PATCH(req, ctx) {
@@ -16,6 +17,7 @@ export async function PATCH(req, ctx) {
   if (!lic.ok) return json({ error: lic.error }, 403);
 
   const id = (await ctx.params).id;
+  if (!isUuid(id)) return json({ error: "Article introuvable" }, 404);
 
   const body = await req.json().catch(() => null);
   const v = validateArticle(body);
@@ -62,6 +64,7 @@ export async function DELETE(req, ctx) {
   if (!lic.ok) return json({ error: lic.error }, 403);
 
   const id = (await ctx.params).id;
+  if (!isUuid(id)) return json({ error: "Article introuvable" }, 404);
 
   const r = await pool.query(
     "UPDATE articles SET actif=false, version=version+1, updated_at=now() WHERE id=$1 AND restaurant_id=$2 RETURNING id",

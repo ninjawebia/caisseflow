@@ -43,4 +43,4 @@ function formatDate(value) {
   return `${p.day}/${p.month}/${p.year}`;
 }
 
-module.exports = { TIME_ZONE, formatDateTime, formatDate };
+module.exports = { formatDateTime, formatDate };

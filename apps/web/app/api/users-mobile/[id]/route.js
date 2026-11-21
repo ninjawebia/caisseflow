@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { getSessionUser, can } from "../../../../lib/auth";
 import { pool } from "../../../../lib/db";
 import { assertSameOrigin, json, audit } from "../../../../lib/http";
+import { isUuid } from "../../../../lib/validate";
 
 // DELETE /api/users-mobile/[id] — disable (trace kept, never deleted).
 export async function DELETE(req, ctx) {
@@ -10,6 +11,7 @@ export async function DELETE(req, ctx) {
   const user = await getSessionUser(await cookies());
   if (!user || !can(user.role, "users") || !user.restaurantId) return json({ error: "Accès refusé" }, 403);
   const id = (await ctx.params).id;
+  if (!isUuid(id)) return json({ error: "Matricule introuvable" }, 404);
 
   const r = await pool.query(
     `UPDATE users_mobile SET actif=false, version=version+1, updated_at=now()

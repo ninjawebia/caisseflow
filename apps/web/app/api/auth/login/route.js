@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { getSessionUser, SESSION_COOKIE, cookieOptions } from "../../../../lib/auth";
+import { SESSION_COOKIE, cookieOptions } from "../../../../lib/auth";
 import { assertSameOrigin, json, rateLimit, registerLoginFailure, clearLoginFailures, audit } from "../../../../lib/http";
 import bcrypt from "bcryptjs";
 import { pool } from "../../../../lib/db";

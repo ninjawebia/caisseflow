@@ -6,16 +6,7 @@ import { assertSameOrigin, json, audit } from "../../../../../lib/http";
 import { licenceGate } from "../../../../../lib/license";
 import fs from "fs";
 import { validate, save, detectImage, ALLOWED, pathOf } from "../../../../../lib/uploads";
-
-// Chargement de l'article du restaurant courant (session web OU jeton appareil).
-// Les tablettes lisent les photos via ce même endpoint (PRD 14.2, sync pull).
-async function loadArticle(id, req) {
-  const user = await getSessionUser(await cookies());
-  if (user && user.restaurantId) return { article: null, user };
-  const device = await deviceAuth(req);
-  if (device) return { article: null, user: { restaurantId: device.restaurantId, role: "appareil", email: `device-${device.poste}` } };
-  return { article: null, user: null };
-}
+import { isUuid } from "../../../../../lib/validate";
 
 // GET /api/articles/[id]/photo — sert le fichier (authentifié), ETag = SHA-256.
 export async function GET(req, ctx) {
@@ -27,6 +18,7 @@ export async function GET(req, ctx) {
     if (device) restaurantId = device.restaurantId;
   }
   if (!restaurantId) return json({ error: "Accès refusé" }, 403);
+  if (!isUuid(id)) return json({ error: "Article introuvable" }, 404);
 
   const r = await pool.query(
     "SELECT photo_file, photo_hash FROM articles WHERE id = $1 AND restaurant_id = $2",
@@ -71,6 +63,7 @@ export async function POST(req, ctx) {
   // Gate licence : écritures refusées si expirée/bloquée (lecture OK, LIC-4).
   const lic = await licenceGate(user.restaurantId);
   if (!lic.ok) return json({ error: lic.error }, 403);
+  if (!isUuid(id)) return json({ error: "Article introuvable" }, 404);
 
 
   const r = await pool.query(
@@ -129,6 +122,7 @@ export async function PATCH(req, ctx) {
   if (!user || !can(user.role, "menu") || !user.restaurantId) return json({ error: "Accès refusé" }, 403);
   const lic = await licenceGate(user.restaurantId);
   if (!lic.ok) return json({ error: lic.error }, 403);
+  if (!isUuid(id)) return json({ error: "Article introuvable" }, 404);
 
   const a = await pool.query(
     "SELECT id FROM articles WHERE id = $1 AND restaurant_id = $2",
@@ -161,6 +155,7 @@ export async function DELETE(req, ctx) {
   // Gate licence : écritures refusées si expirée/bloquée (lecture OK, LIC-4).
   const lic = await licenceGate(user.restaurantId);
   if (!lic.ok) return json({ error: lic.error }, 403);
+  if (!isUuid(id)) return json({ error: "Article introuvable" }, 404);
 
 
   const r = await pool.query(

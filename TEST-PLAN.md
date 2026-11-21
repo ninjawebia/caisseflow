@@ -794,3 +794,41 @@ Batterie **rerun-safe** : poste dédié `POSTE-77`, jeton aléatoire à chaque r
 | TC-EXP-015 | — | En-tête `Cache-Control` d'une erreur (404/410) | `no-store` — un ancien 410 ne peut plus être ressuscité par le cache navigateur | PASS |
 
 **Exécution du 2026-11-21** : web **122/122 PASS** (dont TC-EXP 15/15) ; mobile **135/135** ; total **257 PASS / 0 FAIL**. Contrôle manuel : l'export comptable `95c0d4fc-…` téléchargé en HTTP 200 (6 771 octets, empreinte présente). `TC-EXP` est rerun-safe : fichier et ligne d'export de test supprimés en fin de passage, trace conservée dans `audit_log`.
+
+## 33. Validation des entrées des routes API — TC-VAL (audit clean-code, 2026-11-21)
+
+> **Audit `SKILL-CODE`** : un identifiant de route mal formé (`/api/articles/pas-un-uuid`)
+> était transmis tel quel à PostgreSQL. 13 méthodes répondaient **500**
+> (`invalid input syntax for type uuid`), dont `PATCH`/`DELETE /api/categories/:id`
+> et les photos ; `POST /api/sync/pull?since=pas-une-date` répondait **500**
+> (`invalid input syntax for type timestamp`).
+> Correctif : `apps/web/lib/validate.js` (`isUuid`) devient la **source unique**
+> de validation des identifiants, et `sync/pull` refuse une date ISO invalide.
+> Une entrée mal formée est une **erreur du client** : 404 (ressource
+> introuvable) ou 400 (paramètre invalide), **jamais** 500.
+
+| ID | Précondition | Action | Attendu | Statut |
+| --- | --- | --- | --- | --- |
+| TC-VAL-001 | Gérant connecté | `PATCH /api/articles/:bad` | HTTP 404 | PASS |
+| TC-VAL-002 | — | `DELETE /api/articles/:bad` | HTTP 404 | PASS |
+| TC-VAL-003 | — | `GET /api/articles/:bad/photo` | HTTP 404 | PASS |
+| TC-VAL-004 | — | `POST /api/articles/:bad/photo` | HTTP 404 | PASS |
+| TC-VAL-005 | — | `PATCH /api/articles/:bad/photo` | HTTP 404 | PASS |
+| TC-VAL-006 | — | `DELETE /api/articles/:bad/photo` | HTTP 404 | PASS |
+| TC-VAL-007 | — | `PATCH /api/categories/:bad` | HTTP 404 | PASS |
+| TC-VAL-008 | — | `DELETE /api/categories/:bad` | HTTP 404 | PASS |
+| TC-VAL-009 | — | `DELETE /api/devices/:bad` | HTTP 404 | PASS |
+| TC-VAL-010 | — | `DELETE /api/tables/:bad` | HTTP 404 | PASS |
+| TC-VAL-011 | — | `PATCH /api/users-web/:bad` | HTTP 404 | PASS |
+| TC-VAL-012 | — | `DELETE /api/users-mobile/:bad` | HTTP 404 | PASS |
+| TC-VAL-013 | — | `DELETE /api/media/:bad` | HTTP 404 | PASS |
+| TC-VAL-014 | — | `GET /api/media/:bad/photo` | HTTP 404 | PASS |
+| TC-VAL-015 | — | `GET /api/exports/:bad` | HTTP 404 | PASS |
+| TC-VAL-016 | — | UUID bien formé mais inexistant (`DELETE /api/tables/:unknown`) | HTTP 404 (aucune erreur SQL) | PASS |
+| TC-VAL-017 | Gérant connecté | `POST /api/devices` poste `POSTE-76` | HTTP 201 + jeton en clair | PASS |
+| TC-VAL-018 | Jeton appareil | `POST /api/sync/pull?since=pas-une-date` | HTTP 400 (jamais 500) | PASS |
+| TC-VAL-019 | — | `POST /api/sync/pull?since=2026-01-01` | HTTP 200 | PASS |
+
+**Exécution du 2026-11-21** : web **141/141 PASS** (dont TC-VAL 19/19) ; mobile **135/135** ; total **276 PASS / 0 FAIL**, deux passages consécutifs identiques (rerun-safe : poste `POSTE-76` et ses lignes retirés en fin de passage, `audit_log` conservé).
+
+**Nettoyage associé (même audit)** : suppression du code mort `loadArticle` (route photo, retournait toujours `article: null`), du composant `Forbidden` (jamais importé) et de l'export inutilisé `TIME_ZONE` ; retrait de trois imports inutilisés (`getSessionUser` dans login, `verifyChain` dans sync/push, `syncAllowed` dans sync/pull). Régression détectée et corrigée par les tests : `syncAllowed` était **utilisé** dans `sync/push` (retrait annulé).
