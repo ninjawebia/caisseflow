@@ -249,4 +249,4 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | Correctif | `Cache-Control: private, no-store, max-age=0, must-revalidate` sur **toutes** les réponses (200, 403, 404, 410) via un helper `fail()` ; liens de téléchargement et redirection post-génération suffixés `?v=2` pour invalider les URL déjà en cache. |
 | Régression | `TC-EXP-014` (no-store sur 200) et `TC-EXP-015` (no-store sur erreur). `TC-EXP` **15/15 PASS** ; web **122/122**, mobile **135/135**, total **257 PASS / 0 FAIL**. |
 | Vérification | `GET /api/exports/45e745c0-…?v=2` → **200**, 11 524 octets, `Content-Disposition` JSON correct, `cache-control: private, no-store…` ; les 3 exports existants (csv/json) répondent 200. |
-| Commit | (à remplir) |
+| Commit | `8b369a2` (poussé) |
