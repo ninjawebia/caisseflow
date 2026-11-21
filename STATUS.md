@@ -238,4 +238,4 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | Cause | `new Date(...).toLocaleString("fr-FR")` dans des composants **client** : le serveur rend en UTC (conteneur) et le navigateur dans le fuseau local (Europe/Paris). La même divergence touchait `/appareils` et `/licence` (composants client). |
 | Correctif | `lib/format.js` : formatage déterministe `JJ/MM/AAAA HH:MM` en **Europe/Paris**, assemblé à partir des parties numériques (`Intl.formatToParts`), identique côté serveur et client. Appliqué aux composants client (`ExportsClient`, `DevicesClient`, `LicenceClient`) et aux pages serveur (`journal`, `dashboard`, `audit`, échéances de licence) pour un affichage cohérent. |
 | Vérification | TC-EXP-011..013 (hiver, été, valeurs invalides) ; rendu SSR contrôlé : `/exports` affiche `21/11/2026 01:38` pour `00:38Z`, plus de divergence. Web **120/120 PASS**, mobile **135/135**, total **255 PASS / 0 FAIL**. |
-| Commit | (à remplir) |
+| Commit | `7494ce4` (poussé) |
