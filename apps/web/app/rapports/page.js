@@ -2,6 +2,10 @@ import { pool } from "../../lib/db";
 import { pageContext, LoginRequired } from "../../lib/pages";
 import { Shell } from "../../components/Shell";
 import { Card, PageHeader, EmptyState, ErrorBanner } from "../../components/ui";
+import Pagination from "../../components/Pagination";
+import { parsePage, clampPage } from "../../lib/pagination";
+
+const PAGE_SIZE = 15;
 
 // S-06 — Sales reports (BO-4). Computed from the verified cloud replica.
 export default async function ReportsPage({ searchParams }) {
@@ -17,6 +21,12 @@ export default async function ReportsPage({ searchParams }) {
   let data = null, dbError = null;
   try { data = await load(user.restaurantId, from, to); }
   catch (e) { dbError = "Erreur de chargement des rapports — réessayez"; }
+
+  // Les totaux restent calculés sur toute la période ; seule la liste par jour
+  // est paginée (une période longue peut couvrir plusieurs années).
+  const days = data ? data.byDay : [];
+  const page = clampPage(parsePage(sp.page), days.length, PAGE_SIZE);
+  const visibleDays = days.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <Shell user={user} active="/rapports" licence={licence}>
@@ -52,7 +62,7 @@ export default async function ReportsPage({ searchParams }) {
               <table className="w-full text-sm">
                 <thead><tr className="text-left text-xs font-medium text-slate-500 border-b border-slate-200"><th className="py-2 pr-4">Date</th><th className="py-2 pr-4 text-right">Tickets</th><th className="py-2 text-right">TTC</th></tr></thead>
                 <tbody>
-                  {data.byDay.map((r) => (
+                  {visibleDays.map((r) => (
                     <tr key={r.day} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
                       <td className="py-2 pr-4">{frDate(r.day)}</td>
                       <td className="py-2 pr-4 text-right font-mono tabular-nums">{r.nb}</td>
@@ -67,6 +77,7 @@ export default async function ReportsPage({ searchParams }) {
                 </tbody>
               </table>
             </div>
+            <Pagination page={page} total={days.length} limit={PAGE_SIZE} basePath="/rapports" params={{ from, to }} />
           </Card>
 
           <div className="flex flex-col gap-6">

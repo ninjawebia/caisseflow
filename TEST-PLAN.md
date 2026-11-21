@@ -832,3 +832,39 @@ Batterie **rerun-safe** : poste dédié `POSTE-77`, jeton aléatoire à chaque r
 **Exécution du 2026-11-21** : web **141/141 PASS** (dont TC-VAL 19/19) ; mobile **135/135** ; total **276 PASS / 0 FAIL**, deux passages consécutifs identiques (rerun-safe : poste `POSTE-76` et ses lignes retirés en fin de passage, `audit_log` conservé).
 
 **Nettoyage associé (même audit)** : suppression du code mort `loadArticle` (route photo, retournait toujours `article: null`), du composant `Forbidden` (jamais importé) et de l'export inutilisé `TIME_ZONE` ; retrait de trois imports inutilisés (`getSessionUser` dans login, `verifyChain` dans sync/push, `syncAllowed` dans sync/pull). Régression détectée et corrigée par les tests : `syncAllowed` était **utilisé** dans `sync/push` (retrait annulé).
+
+## 34. Pagination des listes longues — TC-PAG (demande opérateur, 2026-11-21)
+
+> Les listes étaient tronquées en silence : journal et audit `LIMIT 200`,
+> exports `LIMIT 100`, carte du menu affichée en entier (206 articles), rapports
+> par jour sans borne. Une écriture au-delà de la limite devenait inaccessible.
+> Correctif : `lib/pagination.js` = **source unique** du calcul
+> page/limit/offset/liens, composant partagé `components/Pagination.js`
+> (liens serveur avec filtres conservés, ou boutons pour l'état client).
+> Une page hors bornes est ramenée à la dernière (jamais d'écran vide), une
+> valeur `?page=` invalide retombe sur la page 1.
+>
+> Tailles de page : journal **20**, audit **50**, exports **20**, carte du menu
+> **20** (recherche et tri conservés sur toute la carte), rapports par jour **15**.
+
+| ID | Précondition | Action | Attendu | Statut |
+| --- | --- | --- | --- | --- |
+| TC-PAG-001 | — | `parsePage("3" / "0" / "-2" / "abc" / absent)` | `3 / 1 / 1 / 1 / 1` | PASS |
+| TC-PAG-002 | — | `pageCount(202,20)`, `clampPage(999,…)`, `clampPage(0,…)` | `11`, `11`, `1` | PASS |
+| TC-PAG-003 | — | `pageHref("/journal", {q, type}, page)` | filtres conservés, `page=1` omise | PASS |
+| TC-PAG-004 | — | `rangeLabel` (page 1, page 11, total 0) | `1–20 sur 202`, `201–202 sur 202`, `Aucun résultat` | PASS |
+| TC-PAG-005 | Gérant connecté | `GET /journal?page=1` | HTTP 200, page 1 | PASS |
+| TC-PAG-006 | — | `GET /journal?page=2` | HTTP 200, page 2 sur `ceil(n/20)` | PASS |
+| TC-PAG-007 | — | `GET /journal?page=999` | HTTP 200, ramenée à la dernière page | PASS |
+| TC-PAG-008 | — | `GET /journal?page=abc` | HTTP 200, page 1 | PASS |
+| TC-PAG-009 | — | `GET /journal?q=POSTE&type=PAIEMENT` | filtres + pagination simultanés | PASS |
+| TC-PAG-010 | — | `GET /audit` | HTTP 200, page 1 sur `ceil(n/50)` | PASS |
+| TC-PAG-011 | — | `GET /audit?page=2` | HTTP 200, page 2 | PASS |
+| TC-PAG-012 | — | `GET /menu` (SSR) | pagination présente | PASS |
+| TC-PAG-013 | — | `GET /menu` | 20 lignes rendues, `ceil(articles/20)` pages | PASS |
+| TC-PAG-014 | — | `GET /exports` | HTTP 200, total du registre exact | PASS |
+| TC-PAG-015 | — | `GET /rapports` | HTTP 200, liste par jour paginée, totaux complets | PASS |
+
+**Exécution du 2026-11-21** : web **156/156 PASS** (dont TC-PAG 15/15) ; mobile **135/135** ; total **291 PASS / 0 FAIL**, deux passages consécutifs identiques (batterie en lecture seule, donc rerun-safe).
+
+**Note de test** : le rendu SSR de Next insère `<!-- -->` entre les nœuds texte dynamiques ; `TC-PAG-014` compare donc le HTML débarrassé de ces marqueurs (`Registre des exports (<!-- -->4<!-- -->)`).

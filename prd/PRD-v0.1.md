@@ -1041,6 +1041,26 @@ Ajouter, remplacer et supprimer une photo par article, avec stockage persistant 
 - **Mentions légales NF525** : rendues en **données d'exemple figées** (SIRET, récap TVA par taux, TOTAL TTC, empreinte, clôture Z signée) — elles sont imprimées par la caisse, jamais configurables ; l'aperçu ne remplace pas le rendu réel à l'impression (bandeau explicite).
 - **Tests** : TC-TKT 3/3 PASS (TEST-PLAN § 24).
 
+### 14.5 [IMPLÉMENTÉ v0.5] Pagination des listes longues (demande opérateur du 2026-11-21)
+
+Améliorer l'affichage des pages en paginant les listes longues du back-office.
+
+**Périmètre livré :**
+
+| Liste | Route | Taille de page | Mode |
+| --- | --- | --- | --- |
+| Carte du menu (articles) | `/menu` | 20 | client (recherche + tri conservés sur toute la carte) |
+| Journal répliqué | `/journal` | 20 | serveur (filtres `q`, `type` conservés) |
+| Journal d'audit | `/audit` | 50 | serveur (filtres `q`, `action` conservés) |
+| Registre des exports | `/exports` | 20 | serveur |
+| Rapports — totaux par jour | `/rapports` | 15 | serveur (période conservée) |
+
+**Comportement :** bornes affichées (`1–20 sur 206`), page courante, précédent/suivant ; page invalide → page 1 ; page hors bornes → dernière page. Les **totaux** des rapports restent calculés sur toute la période (seule la liste est paginée). Aucun changement de données, de droits RBAC ni d'endpoint d'API.
+
+**Droits RBAC :** inchangés — la pagination est un affichage en lecture ; chaque page reste protégée par les mêmes contrôles (session, rôle, périmètre restaurant).
+
+**Points techniques :** `apps/web/lib/pagination.js` (source unique) + composant partagé `components/Pagination.js` ; batterie `TC-PAG` (15 cas) en lecture seule.
+
 ## 15. Explicitly Rejected Features (Scope Guardrails)
 
 - **Modification ou suppression d'écritures fiscales:** rejetée par conception — viole l'inaltérabilité NF525 ; toute correction est une nouvelle écriture.

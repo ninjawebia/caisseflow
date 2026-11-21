@@ -1,12 +1,14 @@
 "use client";
 import { useState } from "react";
 import { formatDateTime } from "../lib/format";
+import Pagination from "./Pagination";
 
 // S-08 — Exports (BO-5, A10 §18-19). The requester (demandeur) is recorded for
 // every export; each file carries a SHA-256 fingerprint (empreinte) that the
 // accountant can verify against the downloaded bytes.
-export default function ExportsClient({ initial }) {
+export default function ExportsClient({ initial, pagination }) {
   const [items, setItems] = useState(initial);
+  const [total, setTotal] = useState(pagination.total);
   const [msg, setMsg] = useState(null);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ type: "journal", format: "csv", from: "", to: "" });
@@ -27,6 +29,7 @@ export default function ExportsClient({ initial }) {
         return;
       }
       setItems((prev) => [data.export, ...prev]);
+      setTotal((n) => n + 1);
       setMsg({ tone: "success", text: "Export généré — empreinte " + data.export.empreinte.slice(0, 12) + "… Téléchargement lancé." });
       window.location.href = "/api/exports/" + data.export.id + "?v=2";
     } catch {
@@ -89,7 +92,7 @@ export default function ExportsClient({ initial }) {
 
       <section className="lg:col-span-3">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">Registre des exports ({items.length})</h2>
+          <h2 className="text-lg font-semibold text-slate-900 mb-4">Registre des exports ({total})</h2>
           {items.length === 0 ? (
             <div className="py-12 text-center">
               <div className="bg-slate-100 rounded-full p-6 mb-4 inline-flex" aria-hidden="true">📦</div>
@@ -127,6 +130,7 @@ export default function ExportsClient({ initial }) {
               </table>
             </div>
           )}
+          <Pagination page={pagination.page} total={total} limit={pagination.limit} basePath="/exports" />
         </div>
       </section>
     </div>

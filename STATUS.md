@@ -264,3 +264,17 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | Vérification | Purge du volume `.next` + `make up` + `make migrate` puis **deux passages** complets : web **141/141 PASS**, mobile **135/135**, total **276 PASS / 0 FAIL**. |
 | Écart PRD | aucun (qualité interne, aucun changement de comportement fonctionnel). |
 | Commit | `20e20a8` (poussé) |
+
+## Pagination des listes longues (2026-11-21)
+
+| Élément | Résultat |
+| --- | --- |
+| Demande | Améliorer l'affichage des pages : pagination des listes (articles, journal, audit, exports, rapports). Demande opérateur explicite, hors PRD initial → documentée en § 14.5 du PRD et § 9.5 du blueprint. |
+| Problème | Listes tronquées en silence : journal `LIMIT 200`, audit `LIMIT 200`, exports `LIMIT 100`, carte du menu rendue en entier (206 articles), rapports par jour sans borne — toute ligne au-delà devenait inaccessible. |
+| Correctif | `apps/web/lib/pagination.js` = **source unique** (`parsePage`, `pageCount`, `clampPage`, `rangeLabel`, `pageHref`). Composant partagé `components/Pagination.js` : liens serveur qui conservent les filtres, ou boutons pour l'état client. |
+| Comportement | Page invalide (`abc`, `0`, négative) → page 1 ; page au-delà de la dernière → dernière page (jamais d'écran vide) ; bandeau `1–20 sur 206` + numéros + précédent/suivant ; `page=1` omise de l'URL. |
+| Tailles de page | journal **20**, audit **50**, exports **20**, carte du menu **20** (recherche et tri conservés sur toute la carte), rapports par jour **15**. |
+| Fichiers | `lib/pagination.js`, `components/Pagination.js` (nouveaux) ; `app/journal/page.js`, `app/audit/page.js`, `app/exports/page.js`, `app/rapports/page.js`, `components/MenuClient.js`, `components/ExportsClient.js`. |
+| Régression | `TC-PAG` **15 cas** (`apps/web/tests/pagination.js`) : calculs purs, liens avec filtres, pages 1/2/999/invalide, journal filtré, audit, menu SSR (20 lignes), total des exports, rapports. En lecture seule → rerun-safe. |
+| Vérification | Purge du volume `.next` + `make up` + `make migrate`, puis **deux passages** : web **156/156 PASS**, mobile **135/135**, total **291 PASS / 0 FAIL**. |
+| Écart PRD | aucun sur l'existant ; évolution d'affichage documentée au backlog PRD (§ 14.5), sans changement de données ni de droits RBAC. |

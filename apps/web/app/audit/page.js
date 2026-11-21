@@ -3,6 +3,10 @@ import { pageContext, LoginRequired } from "../../lib/pages";
 import { Shell } from "../../components/Shell";
 import { Card, PageHeader, EmptyState, StatusPill } from "../../components/ui";
 import { formatDateTime } from "../../lib/format";
+import { parsePage, clampPage } from "../../lib/pagination";
+import Pagination from "../../components/Pagination";
+
+const PAGE_SIZE = 50;
 
 // S-10 — Audit trail, read-only (PRD 10.5, BO-7). Every back-office action
 // lands here; the table itself is append-only (UPDATE/DELETE blocked in SQL).
@@ -21,9 +25,16 @@ export default async function AuditPage({ searchParams }) {
   if (q) { params.push("%" + q + "%"); where += " AND (actor_email ILIKE $" + (params.length) + " OR entity ILIKE $" + (params.length) + " OR entity_id::text ILIKE $" + (params.length) + ")"; }
   if (action) { params.push(action); where += " AND action = $" + (params.length); }
 
+  const totalRes = await pool.query(
+    `SELECT COUNT(*)::int AS n FROM audit_log WHERE ` + where,
+    params
+  );
+  const total = totalRes.rows[0].n;
+  const page = clampPage(parsePage(sp.page), total, PAGE_SIZE);
+
   const rows = await pool.query(
     `SELECT id, actor_email, action, entity, entity_id, diff_summary, "timestamp"
-     FROM audit_log WHERE ` + where + ` ORDER BY "timestamp" DESC LIMIT 200`,
+     FROM audit_log WHERE ` + where + ` ORDER BY "timestamp" DESC, id DESC LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`,
     params
   );
   const actions = await pool.query("SELECT DISTINCT action FROM audit_log ORDER BY action");
@@ -80,6 +91,7 @@ export default async function AuditPage({ searchParams }) {
             </table>
           </div>
         )}
+        <Pagination page={page} total={total} limit={PAGE_SIZE} basePath="/audit" params={{ q, action }} />
       </Card>
     </Shell>
   );

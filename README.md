@@ -71,7 +71,7 @@ utilisé ; `prisma-studio` est remplacé par **Adminer**. Toute mutation des DTO
 | --- | --- |
 | `make up` / `make down` / `make logs` | Cycle de vie des conteneurs dev |
 | `make migrate` / `make seed` | Base (dans le conteneur web) |
-| `make test` | Tests web (141) + tests de la caisse mobile (135) |
+| `make test` | Tests web (156) + tests de la caisse mobile (135) |
 | `make test-mobile` | Socle mobile seul (`node --test`, image `node:22-alpine`) — architecture : `docs/MOBILE-SOCLE.md` |
 | `make chain-check` / `make healthcheck` | Chaînage NF525 + santé des services |
 | `make smoke` | Test de fumée complet |

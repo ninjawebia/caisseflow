@@ -234,3 +234,10 @@ A detailed UI/UX design specification. No reference images were supplied (PRD A9
 - **Rendu** : ticket ~224 px (`w-56`) centré, fond blanc, police monospace 11 px, séparateurs pointillés slate-400, ombre portée légère ; en-tête logo (saisi, en majuscules) + raison sociale/adresse/SIRET du restaurant ; lignes d'exemple, RÉCAP TVA, TOTAL TTC en gras, paiement, empreinte ; mentions libres du modèle en italique centré.
 - **États/comportement** : mise à jour en direct (live pendant la frappe, aucune soumission nécessaire) ; mentions NF525 en données d'exemple figées ; bandeau discret « ~ Aperçu approchant — rendu réel à l'impression (ESC/POS) ~ » (9 px, slate-500) pour éviter toute confusion avec le ticket imprimé.
 - **Règles dictionnaire** : `data-testid="ticket-preview"` pour les tests, pas d'information portée par la couleur seule, texte sélectionnable désactivé (`select-none`).
+
+### 9.5 Pagination des listes longues (v0.5 — demande opérateur)
+- **Emplacement** : pied du tableau, dans la carte de liste (journal, audit, exports, rapports par jour) et sous la carte du menu ; séparé par un filet `border-t border-slate-200`.
+- **Composition** : à gauche les bornes `1–20 sur 206` (12 px, slate-500, `font-mono tabular-nums`) ; à droite les contrôles page précédente / numéros / page suivante — cibles 32 px, `rounded-lg border`, page courante bleu-600 plein, numéros groupés avec `…` au-delà de 7 pages.
+- **Comportement** : les liens **conservent les filtres** actifs (recherche, type, action, période) ; `page=1` est omis de l'URL ; une page hors bornes est ramenée à la dernière et une valeur invalide retombe sur la page 1 — jamais d'écran vide. La recherche du menu pagine côté client et revient en page 1 à chaque nouvelle recherche ou tri.
+- **États** : total 0 → composant masqué (l'état vide existant prend le relais) ; une seule page → bornes affichées, flèches désactivées (slate-300, `aria-disabled`).
+- **Accessibilité** : `nav[aria-label="Pagination"]`, `aria-current="page"` sur la page courante, libellés des flèches explicites, numéro de page toujours en texte (aucune information portée par la couleur seule).

@@ -1,6 +1,11 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import MediaPicker from "./MediaPicker";
+import Pagination from "./Pagination";
+
+// Liste d'articles paginée côté client : le gérant garde la recherche et le tri
+// sur l'ensemble de la carte, seules les lignes affichées changent de page.
+const PAGE_SIZE = 20;
 
 // Menu management (S-03). Gérant only (PRD 3.2). All mutations go through the
 // API which re-validates server-side and writes the audit trail (BO-1).
@@ -17,6 +22,7 @@ export default function MenuClient({ categories, articles }) {
   // Recherche (🔍) + tri de la liste d'articles.
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState(null); // null = ordre serveur | {key:"nom"|"cat", dir:"asc"|"desc"}
+  const [page, setPage] = useState(1);
 
   // --- État du panneau catégories (F1) ---
   const [catBusy, setCatBusy] = useState(false);
@@ -299,6 +305,13 @@ export default function MenuClient({ categories, articles }) {
     return list;
   }, [items, query, sort]);
 
+  // Une nouvelle recherche ou un nouveau tri repart de la première page.
+  useEffect(() => { setPage(1); }, [query, sort]);
+
+  const pages = Math.max(1, Math.ceil(visibleItems.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pages);
+  const pageItems = visibleItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
   // Clic sur l'en-tête : asc → desc → retour à l'ordre serveur.
   function toggleSort(key) {
     setSort((s) => (s?.key !== key ? { key, dir: "asc" } : s.dir === "asc" ? { key, dir: "desc" } : null));
@@ -461,7 +474,9 @@ export default function MenuClient({ categories, articles }) {
       <section className="lg:col-span-3">
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
           <div className="flex items-center justify-between gap-4 mb-4">
-            <h2 className="text-lg font-semibold text-slate-900 whitespace-nowrap">Carte du restaurant ({items.length})</h2>
+            <h2 className="text-lg font-semibold text-slate-900 whitespace-nowrap">
+              Carte du restaurant ({visibleItems.length}{query ? ` / ${items.length}` : ""})
+            </h2>
             {/* Recherche 🔍 — filtre temps réel sur le nom et la catégorie */}
             <div className="relative flex-1 max-w-xs">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" aria-hidden="true">
@@ -513,7 +528,7 @@ export default function MenuClient({ categories, articles }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleItems.map((a) => (
+                  {pageItems.map((a) => (
                     <tr key={a.id} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
                       <td className="py-2 pr-4">
                         {a.photo_hash ? (
@@ -543,6 +558,7 @@ export default function MenuClient({ categories, articles }) {
               </table>
             </div>
           )}
+          <Pagination page={currentPage} total={visibleItems.length} limit={PAGE_SIZE} onChange={setPage} />
         </div>
       </section>
     </div>

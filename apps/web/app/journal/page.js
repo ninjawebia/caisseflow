@@ -4,6 +4,10 @@ import { Shell } from "../../components/Shell";
 import { Card, PageHeader, StatusPill, EmptyState } from "../../components/ui";
 import { verifyChainsByPoste } from "../../lib/fiscal";
 import { formatDateTime } from "../../lib/format";
+import { parsePage, clampPage } from "../../lib/pagination";
+import Pagination from "../../components/Pagination";
+
+const PAGE_SIZE = 20;
 
 // S-07 — Replica journal, read-only (BO-6). Full SHA-256 chain verification on
 // every load (FISC-7): any broken link is displayed as a blocking incident.
@@ -32,13 +36,20 @@ export default async function JournalPage({ searchParams }) {
   if (type) { filters.push(type); where += ` AND type=$${filters.length}`; }
   if (q) { filters.push(`%${q}%`); where += ` AND (ref ILIKE $${filters.length} OR user_matricule ILIKE $${filters.length} OR payload::text ILIKE $${filters.length})`; }
 
+  const totalRes = await pool.query(
+    `SELECT COUNT(*)::int AS n FROM journal_replica WHERE ${where}`,
+    filters
+  );
+  const total = totalRes.rows[0].n;
+  const page = clampPage(parsePage(sp.page), total, PAGE_SIZE);
+
   const rows = await pool.query(
     `SELECT id, poste, seq, ref, type, "timestamp", user_matricule, validator_matricule, motif, hash_self, payload,
             CASE WHEN type IN ('PAIEMENT','ANNULATION','REMISE') THEN (payload->>'montant')::numeric
                  WHEN type='VENTE' THEN (payload->>'total')::numeric
                  ELSE NULL END AS amount
      FROM journal_replica WHERE ${where}
-     ORDER BY "timestamp" DESC LIMIT 200`,
+     ORDER BY "timestamp" DESC, id DESC LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`,
     filters
   );
 
@@ -101,6 +112,7 @@ export default async function JournalPage({ searchParams }) {
             </table>
           </div>
         )}
+        <Pagination page={page} total={total} limit={PAGE_SIZE} basePath="/journal" params={{ q, type }} />
       </Card>
     </Shell>
   );
