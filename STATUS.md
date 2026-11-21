@@ -263,3 +263,4 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | Régression ajoutée | `TC-VAL` **19 cas** (`apps/web/tests/api-validation.js`), intégrée à `npm test` : 15 identifiants mal formés, UUID inconnu, `since` invalide et valide. Rerun-safe (poste `POSTE-76` supprimé en fin de passage). |
 | Vérification | Purge du volume `.next` + `make up` + `make migrate` puis **deux passages** complets : web **141/141 PASS**, mobile **135/135**, total **276 PASS / 0 FAIL**. |
 | Écart PRD | aucun (qualité interne, aucun changement de comportement fonctionnel). |
+| Commit | `20e20a8` (poussé) |
