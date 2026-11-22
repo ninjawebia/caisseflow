@@ -196,6 +196,28 @@ const MIGRATIONS = [
       `CREATE INDEX IF NOT EXISTS idx_commande_lignes_cmd ON commande_lignes(commande_id)`,
     ],
   },
+  {
+    version: 6,
+    name: "images",
+    statements: [
+      // Présentation des images (v0.5). Les photos restent des FICHIERS
+      // servis par le serveur : seule leur empreinte est stockée ici (aucun
+      // binaire dans SQLite). Un style résolu accompagne chaque ligne — un
+      // article/catégorie sans style propre reçoit le défaut du menu.
+      `ALTER TABLE categories ADD COLUMN photo_hash TEXT`,
+      `ALTER TABLE categories ADD COLUMN photo_updated_at TEXT`,
+      `ALTER TABLE categories ADD COLUMN preset_forme TEXT`,
+      `ALTER TABLE categories ADD COLUMN preset_cadrage TEXT`,
+      `ALTER TABLE categories ADD COLUMN preset_ratio TEXT`,
+      `ALTER TABLE categories ADD COLUMN preset_rayon INTEGER`,
+      `ALTER TABLE categories ADD COLUMN preset_ombre INTEGER`,
+      `ALTER TABLE articles ADD COLUMN preset_forme TEXT`,
+      `ALTER TABLE articles ADD COLUMN preset_cadrage TEXT`,
+      `ALTER TABLE articles ADD COLUMN preset_ratio TEXT`,
+      `ALTER TABLE articles ADD COLUMN preset_rayon INTEGER`,
+      `ALTER TABLE articles ADD COLUMN preset_ombre INTEGER`,
+    ],
+  },
 ];
 
 function latestVersion() {

@@ -10,6 +10,7 @@
 //  - articles = pull DELTA (`since`) → aucun absent n'est désactivé, un article
 //    désactivé arrive explicitement avec `actif = false`.
 const { normalizeReference, groupMenu } = require("../core/reference");
+const { presetFromRow } = require("../core/preset");
 const { KEYS, getSetting, setSetting } = require("./settings");
 const S = require("./reference-sql");
 
@@ -65,7 +66,15 @@ async function readMenu(db) {
   const categories = await db.getAllAsync(S.SELECT_MENU_CATEGORIES_SQL);
   const articles = await db.getAllAsync(S.SELECT_MENU_ARTICLES_SQL);
   return groupMenu(
-    categories.map((c) => ({ id: c.id, nom: c.nom, position: Number(c.position), actif: Number(c.actif) })),
+    categories.map((c) => ({
+      id: c.id,
+      nom: c.nom,
+      position: Number(c.position),
+      actif: Number(c.actif),
+      photoHash: c.photo_hash || null,
+      photoUpdatedAt: c.photo_updated_at || null,
+      preset: presetFromRow(c),
+    })),
     articles.map((a) => ({
       id: a.id,
       categorieId: a.categorie_id,
@@ -75,6 +84,7 @@ async function readMenu(db) {
       actif: Number(a.actif),
       version: Number(a.version),
       photoHash: a.photo_hash,
+      preset: presetFromRow(a),
     }))
   );
 }

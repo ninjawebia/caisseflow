@@ -173,6 +173,37 @@ test("carte groupée : seules les catégories et articles actifs sont servis", a
   assert.equal("actif" in menu[1].articles[0], true);
 });
 
+test("migration 6 : photo et style de catégorie/article persistés puis relus", async () => {
+  const db = await freshDb();
+  const cols = (await db.getAllAsync("PRAGMA table_info(categories)")).map((c) => c.name);
+  for (const c of ["photo_hash", "photo_updated_at", "preset_forme", "preset_rayon", "preset_ombre"]) {
+    assert.ok(cols.includes(c), `colonne ${c}`);
+  }
+
+  const presetCat = { forme: "carre", cadrage: "contain", ratio: "4:3", rayon: 8, ombre: true };
+  const presetArt = { forme: "cercle", cadrage: "cover", ratio: "1:1", rayon: 64, ombre: false };
+  await saveReference(db, {
+    categories: [{
+      id: CAT_A, nom: "Sandwich", position: 1, actif: true,
+      photo_hash: "abc123", photo_updated_at: "2026-11-21T10:00:00.000Z", preset: presetCat,
+    }],
+    articles: [article(ART_A, "Chawarma", CAT_A, 10, { photo_hash: "def456", preset: presetArt })],
+    tables: [],
+  });
+
+  const [group] = await readMenu(db);
+  assert.equal(group.photoHash, "abc123");
+  assert.deepEqual(group.preset, presetCat);
+  assert.equal(group.articles[0].photoHash, "def456");
+  assert.deepEqual(group.articles[0].preset, presetArt);
+
+  // Repli : une ligne écrite sans style (ancienne version) reste affichable.
+  await db.runAsync("UPDATE articles SET preset_forme = NULL, preset_rayon = NULL WHERE id = ?", [ART_A]);
+  const [reloaded] = await readMenu(db);
+  assert.deepEqual(reloaded.articles[0].preset,
+    { forme: "arrondi", cadrage: "cover", ratio: "1:1", rayon: 12, ombre: false });
+});
+
 test("métadonnées : dernière synchro (heure serveur) et licence en cache", async () => {
   const db = await freshDb();
   assert.equal(await getLastPull(db), null, "aucun pull au premier démarrage");

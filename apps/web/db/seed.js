@@ -7,6 +7,7 @@ const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const { pool } = require("../lib/db");
 const { nextHash, shortHash, sha256hex } = require("../lib/fiscal");
+const { PRESET_DEFAUT } = require("@caisseflow/shared");
 
 const demoWebUsers = [
   { email: "gerant@local.test", role: "gerant", nom: "Camille Gérant", pwd: "Gerant123!" },
@@ -64,6 +65,18 @@ async function main() {
     await c.query(
       "INSERT INTO licences (restaurant_id, etat) VALUES ($1, 'active')", [rest]
     );
+
+    // Styles d'image par défaut (v0.5) : BO et menu tablette. Les contextes
+    // ticket/kiosque seront ajoutés quand leurs écrans arriveront — aucune
+    // migration supplémentaire, seulement une ligne de plus.
+    for (const [contexte, preset] of Object.entries(PRESET_DEFAUT)) {
+      await c.query(
+        `INSERT INTO image_presets
+           (restaurant_id, nom, forme, cadrage, ratio, rayon, ombre, contexte, par_defaut)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true)`,
+        [rest, preset.nom, preset.forme, preset.cadrage, preset.ratio, preset.rayon, preset.ombre, contexte]
+      );
+    }
 
     for (const u of demoWebUsers) {
       const hash = bcrypt.hashSync(u.pwd, 10);

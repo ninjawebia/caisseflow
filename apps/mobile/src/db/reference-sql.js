@@ -7,16 +7,29 @@ function placeholders(count) {
 }
 
 // --- Catégories (pull COMPLET : un absent est désactivé) ------------------
-const UPSERT_CATEGORY_SQL = `INSERT INTO categories (id, nom, position, actif, synced_at)
-  VALUES (?,?,?,?,datetime('now'))
+const UPSERT_CATEGORY_SQL = `INSERT INTO categories
+    (id, nom, position, actif, photo_hash, photo_updated_at,
+     preset_forme, preset_cadrage, preset_ratio, preset_rayon, preset_ombre, synced_at)
+  VALUES (?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
   ON CONFLICT(id) DO UPDATE SET
     nom = excluded.nom,
     position = excluded.position,
     actif = excluded.actif,
+    photo_hash = excluded.photo_hash,
+    photo_updated_at = excluded.photo_updated_at,
+    preset_forme = excluded.preset_forme,
+    preset_cadrage = excluded.preset_cadrage,
+    preset_ratio = excluded.preset_ratio,
+    preset_rayon = excluded.preset_rayon,
+    preset_ombre = excluded.preset_ombre,
     synced_at = excluded.synced_at`;
 
 function upsertCategoryArgs(row) {
-  return [row.id, row.nom, row.position, row.actif];
+  const p = row.preset || {};
+  return [
+    row.id, row.nom, row.position, row.actif, row.photoHash, row.photoUpdatedAt,
+    p.forme, p.cadrage, p.ratio, p.rayon, p.ombre ? 1 : 0,
+  ];
 }
 
 function deactivateMissingCategoriesSql(count) {
@@ -27,8 +40,9 @@ function deactivateMissingCategoriesSql(count) {
 // Un article désactivé côté serveur arrive avec `actif = false` dans le delta ;
 // un article simplement inchangé est absent du lot et doit rester actif.
 const UPSERT_ARTICLE_SQL = `INSERT INTO articles
-    (id, categorie_id, nom, prix_ttc_cents, taux_tva, actif, version, photo_hash, updated_at, synced_at)
-  VALUES (?,?,?,?,?,?,?,?,?,datetime('now'))
+    (id, categorie_id, nom, prix_ttc_cents, taux_tva, actif, version, photo_hash, updated_at,
+     preset_forme, preset_cadrage, preset_ratio, preset_rayon, preset_ombre, synced_at)
+  VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,datetime('now'))
   ON CONFLICT(id) DO UPDATE SET
     categorie_id = excluded.categorie_id,
     nom = excluded.nom,
@@ -38,12 +52,19 @@ const UPSERT_ARTICLE_SQL = `INSERT INTO articles
     version = excluded.version,
     photo_hash = excluded.photo_hash,
     updated_at = excluded.updated_at,
+    preset_forme = excluded.preset_forme,
+    preset_cadrage = excluded.preset_cadrage,
+    preset_ratio = excluded.preset_ratio,
+    preset_rayon = excluded.preset_rayon,
+    preset_ombre = excluded.preset_ombre,
     synced_at = excluded.synced_at`;
 
 function upsertArticleArgs(row) {
+  const p = row.preset || {};
   return [
     row.id, row.categorieId, row.nom, row.prixTtcCents, row.tauxTva,
     row.actif, row.version, row.photoHash, row.updatedAt,
+    p.forme, p.cadrage, p.ratio, p.rayon, p.ombre ? 1 : 0,
   ];
 }
 
@@ -72,9 +93,14 @@ const SELECT_REFERENCE_COUNTS_SQL = `SELECT
     (SELECT COUNT(*) FROM tables_resto WHERE actif = 1) AS tables,
     (SELECT COUNT(*) FROM staff WHERE actif = 1) AS staff`;
 
-const SELECT_MENU_CATEGORIES_SQL = `SELECT id, nom, position, actif FROM categories ORDER BY position, nom`;
+const SELECT_MENU_CATEGORIES_SQL = `SELECT
+    id, nom, position, actif, photo_hash, photo_updated_at,
+    preset_forme, preset_cadrage, preset_ratio, preset_rayon, preset_ombre
+  FROM categories ORDER BY position, nom`;
 
-const SELECT_MENU_ARTICLES_SQL = `SELECT id, categorie_id, nom, prix_ttc_cents, taux_tva, actif, version, photo_hash
+const SELECT_MENU_ARTICLES_SQL = `SELECT
+    id, categorie_id, nom, prix_ttc_cents, taux_tva, actif, version, photo_hash,
+    preset_forme, preset_cadrage, preset_ratio, preset_rayon, preset_ombre
   FROM articles ORDER BY nom`;
 
 const SELECT_TABLES_SQL = `SELECT id, nom, salle, places FROM tables_resto WHERE actif = 1 ORDER BY salle, nom`;

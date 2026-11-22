@@ -540,6 +540,8 @@ export default function App() {
         error={orderError}
         notice={orderNotice}
         user={user}
+        serverUrl={enrollment.serverUrl}
+        token={enrollment.token}
         onBack={leaveOrder}
         onLock={handleManualLock}
         onAddArticle={handleAddArticle}

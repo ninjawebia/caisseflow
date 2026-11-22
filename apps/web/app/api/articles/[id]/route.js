@@ -4,6 +4,7 @@ import { pool } from "../../../../lib/db";
 import { assertSameOrigin, json, audit } from "../../../../lib/http";
 import { licenceGate } from "../../../../lib/license";
 import { validateArticle } from "@caisseflow/shared";
+import { validPresetId } from "../../../../lib/presets";
 import { isUuid } from "../../../../lib/validate";
 
 // PATCH /api/articles/[id] — update (price change creates a new version, BO-1).
@@ -27,9 +28,17 @@ export async function PATCH(req, ctx) {
   const actif = body?.actif !== false;
 
   const before = await pool.query(
-    "SELECT prix_ttc FROM articles WHERE id=$1 AND restaurant_id=$2", [id, user.restaurantId]
+    "SELECT prix_ttc, preset_id FROM articles WHERE id=$1 AND restaurant_id=$2", [id, user.restaurantId]
   );
   if (before.rowCount === 0) return json({ error: "Article introuvable" }, 404);
+
+  // Style d'image : NULL = preset par défaut du restaurant (contexte menu).
+  let presetId = before.rows[0].preset_id ?? null;
+  if (body?.preset_id !== undefined) {
+    const preset = await validPresetId(user.restaurantId, body.preset_id);
+    if (!preset.ok) return json({ error: preset.error }, 400);
+    presetId = preset.id;
+  }
 
   try {
     // Price change bumps the data version (sync devices pick it up; history of
@@ -38,11 +47,11 @@ export async function PATCH(req, ctx) {
     const r = await pool.query(
       `UPDATE articles
        SET nom=$1, prix_ttc=$2, taux_tva=$3, categorie_id=$4, actif=$5,
-           version = version + $6, updated_at = now()
+           version = version + $6, updated_at = now(), preset_id=$9
        WHERE id=$7 AND restaurant_id=$8
-       RETURNING id, nom, prix_ttc, taux_tva, actif, categorie_id,
+       RETURNING id, nom, prix_ttc, taux_tva, actif, categorie_id, preset_id,
                  (SELECT c.nom FROM categories c WHERE c.id = articles.categorie_id) AS categorie_nom`,
-      [nom, prix, tva, cat, actif, bump, id, user.restaurantId]
+      [nom, prix, tva, cat, actif, bump, id, user.restaurantId, presetId]
     );
     const article = { ...r.rows[0], prix_ttc: Number(r.rows[0].prix_ttc), taux_tva: Number(r.rows[0].taux_tva) };
     await audit(user, "update", "articles", id, { nom, prix_ttc: prix, taux_tva: tva, actif });

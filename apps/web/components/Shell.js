@@ -5,6 +5,7 @@ import { StatusPill } from "./ui";
 const NAV = [
   { href: "/dashboard", label: "Dashboard", perm: "any" },
   { href: "/menu", label: "Menu & TVA", perm: "menu" },
+  { href: "/apparence", label: "Apparence", perm: "menu" },
   { href: "/utilisateurs", label: "Utilisateurs", perm: "users" },
   { href: "/tables", label: "Tables & salles", perm: "tables" },
   { href: "/appareils", label: "Appareils", perm: "devices" },

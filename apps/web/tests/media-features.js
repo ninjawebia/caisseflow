@@ -69,6 +69,9 @@ async function main() {
   const u1b = await u1.json().catch(() => ({}));
   check("TC-MED-001", u1.status === 201 && u1b.media?.id && u1b.media?.hash, `HTTP ${u1.status}`);
   const med1 = u1b.media;
+  // v0.5 : chaque original reçoit 3 dérivés WebP (thumb/card/full) — on mesure
+  // donc le dédoublonnage APRÈS ce premier envoi, pas avant.
+  const afterFirstFiles = fs.readdirSync(uploadsLib.uploadDir()).filter((f) => f !== "archived").length;
 
   // MED-002 : DÉDUPLICATION — même contenu re-téléversé → même asset, 0 nouvelle ligne/fichier
   const u2 = await up1(pngUnique("a"), "dup.png");
@@ -76,8 +79,9 @@ async function main() {
   const afterDupMedia = (await pool.query("SELECT COUNT(*)::int AS n FROM media")).rows[0].n;
   const afterDupFiles = fs.readdirSync(uploadsLib.uploadDir()).filter((f) => f !== "archived").length;
   check("TC-MED-002",
-    u2.status === 200 && u2b.dedup === true && u2b.media?.id === med1.id && afterDupMedia === beforeMedia + 1 && afterDupFiles === beforeFiles + 1,
-    `HTTP ${u2.status}, dedup=${u2b.dedup}, Δlignes=${afterDupMedia - beforeMedia}, Δfichiers=${afterDupFiles - beforeFiles}`);
+    u2.status === 200 && u2b.dedup === true && u2b.media?.id === med1.id &&
+      afterDupMedia === beforeMedia + 1 && afterDupFiles === afterFirstFiles,
+    `HTTP ${u2.status}, dedup=${u2b.dedup}, Δlignes=${afterDupMedia - beforeMedia}, Δfichiers(dedup)=${afterDupFiles - afterFirstFiles}`);
 
   // MED-003 : fichier invalide (PDF renommé) → 400 magic bytes
   const u3 = await up1(pdfRenamed, "fake.jpg");

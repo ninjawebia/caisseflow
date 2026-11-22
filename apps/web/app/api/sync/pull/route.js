@@ -2,6 +2,7 @@ import { deviceAuth } from "../../../../lib/device";
 import { licenceGate } from "../../../../lib/license";
 import { pool } from "../../../../lib/db";
 import { json } from "../../../../lib/http";
+import { ensureDefaults, presetJoin, presetColumns } from "../../../../lib/presets";
 
 // POST /api/sync/pull — reference data delta (menu, TVA, staff, tables) for the
 // tablet caisse and terminals (PRD SYNC-3, last-write-wins on reference data).
@@ -25,17 +26,24 @@ export async function POST(req) {
     return json({ error: "Paramètre since invalide (date ISO 8601 attendue)" }, 400);
   }
 
+  // Presets par défaut garantis même si le seed n'a pas tourné (idempotent).
+  await ensureDefaults(device.restaurantId);
+
   const cats = await pool.query(
     // `actif` est transmis explicitement, mais le pull ne contient que les
     // catégories ACTIVES : une catégorie archivée disparaît du lot, et la
     // caisse la désactive localement (pull complet, jamais de suppression).
-    `SELECT id, nom, position, actif FROM categories
-     WHERE restaurant_id=$1 AND actif = true ORDER BY position`,
+    `SELECT c.id, c.nom, c.position, c.actif, c.photo_hash, c.photo_updated_at,
+            ${presetColumns("c")}
+     FROM categories c ${presetJoin("c")}
+     WHERE c.restaurant_id=$1 AND c.actif = true ORDER BY c.position`,
     [device.restaurantId]
   );
   const arts = await pool.query(
-    `SELECT id, categorie_id, nom, prix_ttc, taux_tva, actif, version, photo_hash, updated_at
-     FROM articles WHERE restaurant_id=$1 AND updated_at > $2 ORDER BY nom`,
+    `SELECT a.id, a.categorie_id, a.nom, a.prix_ttc, a.taux_tva, a.actif, a.version,
+            a.photo_hash, a.updated_at, ${presetColumns("a")}
+     FROM articles a ${presetJoin("a")}
+     WHERE a.restaurant_id=$1 AND a.updated_at > $2 ORDER BY a.nom`,
     [device.restaurantId, sinceDate]
   );
   const staff = await pool.query(
@@ -51,8 +59,22 @@ export async function POST(req) {
 
   return json({
     poste: device.poste,
-    categories: cats.rows,
-    articles: arts.rows.map((a) => ({ ...a, prix_ttc: Number(a.prix_ttc), taux_tva: Number(a.taux_tva) })),
+    categories: cats.rows.map((c) => ({
+      ...c,
+      preset: {
+        forme: c.preset_forme, cadrage: c.preset_cadrage, ratio: c.preset_ratio,
+        rayon: Number(c.preset_rayon), ombre: c.preset_ombre,
+      },
+    })),
+    articles: arts.rows.map((a) => ({
+      ...a,
+      prix_ttc: Number(a.prix_ttc),
+      taux_tva: Number(a.taux_tva),
+      preset: {
+        forme: a.preset_forme, cadrage: a.preset_cadrage, ratio: a.preset_ratio,
+        rayon: Number(a.preset_rayon), ombre: a.preset_ombre,
+      },
+    })),
     users: staff.rows.map((u) => ({ matricule: u.matricule, nom: u.nom, role: u.role, pinHash: u.pin_hash, actif: u.actif, version: u.version })),
     tables: tables.rows,
     licence: { etat: lic.rows[0]?.etat || "active" },

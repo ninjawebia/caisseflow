@@ -12,7 +12,8 @@ export async function GET() {
   const user = await getSessionUser(await cookies());
   if (!user || !can(user.role, "menu") || !user.restaurantId) return json({ error: "Accès refusé" }, 403);
   const r = await pool.query(
-    `SELECT c.id, c.nom, c.position, c.actif, COUNT(a.id)::int AS nb_articles
+    `SELECT c.id, c.nom, c.position, c.actif, c.photo_hash, c.preset_id,
+            COUNT(a.id)::int AS nb_articles
      FROM categories c LEFT JOIN articles a ON a.categorie_id = c.id
      WHERE c.restaurant_id = $1
      GROUP BY c.id ORDER BY c.position, c.nom`,
@@ -39,7 +40,7 @@ export async function POST(req) {
 
   try {
     const r = await pool.query(
-      "INSERT INTO categories (restaurant_id, nom, position) VALUES ($1,$2,$3) RETURNING id, nom, position, actif",
+      "INSERT INTO categories (restaurant_id, nom, position) VALUES ($1,$2,$3) RETURNING id, nom, position, actif, preset_id",
       [user.restaurantId, nom, position]
     );
     await audit(user, "create", "categories", r.rows[0].id, { nom, position });

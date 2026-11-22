@@ -9,8 +9,8 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 
-const MAX_BYTES = 2 * 1024 * 1024; // 2 Mo
-const MAX_DIM = 2048; // px
+const MAX_BYTES = 5 * 1024 * 1024; // 5 Mo (photos de téléphone)
+const MAX_DIM = 4096; // px — l'original est archivé, les dérivés sont légers
 const ALLOWED = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
 
 function uploadDir() {
@@ -70,7 +70,7 @@ function dimensions(buf, type) {
 // Validation complète : { ok, ext, hash } | { ok:false, error }
 function validate(buffer) {
   if (!buffer || buffer.length === 0) return { ok: false, error: "Fichier vide" };
-  if (buffer.length > MAX_BYTES) return { ok: false, error: "Photo trop volumineuse (2 Mo maximum)" };
+  if (buffer.length > MAX_BYTES) return { ok: false, error: "Photo trop volumineuse (5 Mo maximum)" };
   const type = detectImage(buffer);
   if (!type) return { ok: false, error: "Format non autorisé — JPEG, PNG ou WebP uniquement" };
   const dim = dimensions(buffer, type);
@@ -111,4 +111,20 @@ function pathOf(file) {
   return path.join(uploadDir(), file);
 }
 
-module.exports = { validate, save, archive, pathOf, uploadDir, detectImage, MAX_BYTES, MAX_DIM, ALLOWED };
+// Dérivés WebP générés à l'upload (lib/images.js) : même base que l'original,
+// suffixe de variante. Un fichier absent est régénéré à la demande (photos
+// antérieures à la v0.5) — jamais servi en 404 si l'original existe.
+const VARIANTS = Object.freeze(["thumb", "card", "full"]);
+
+function variantFileOf(file, variant) {
+  return `${file.replace(/\.[^.]+$/, "")}-${variant}.webp`;
+}
+
+function variantPathOf(file, variant) {
+  return path.join(uploadDir(), variantFileOf(file, variant));
+}
+
+module.exports = {
+  validate, save, archive, pathOf, uploadDir, detectImage,
+  MAX_BYTES, MAX_DIM, ALLOWED, VARIANTS, variantFileOf, variantPathOf,
+};

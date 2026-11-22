@@ -4,6 +4,7 @@
 // jamais insérée « au mieux ». Pur → testable sans appareil.
 const { isValidUuid } = require("./uuid");
 const { toCents } = require("./money");
+const { normalizePreset } = require("./preset");
 
 const NOM_MAX = 80;
 const SALLE_MAX = 40;
@@ -20,6 +21,13 @@ function bad(reason) {
   return { reason };
 }
 
+// Date ISO normalisée, `null` si illisible : jamais de date inventée.
+function normalizeDate(value) {
+  if (!value) return null;
+  const ms = Date.parse(value);
+  return Number.isNaN(ms) ? null : new Date(ms).toISOString();
+}
+
 // --- Catégories ----------------------------------------------------------
 function normalizeCategory(row) {
   if (!row || typeof row !== "object") return bad("ligne");
@@ -33,6 +41,10 @@ function normalizeCategory(row) {
     nom,
     position,
     actif: isActiveFlag(row.actif) ? 1 : 0,
+    // Photo de catégorie (v0.5) : seule l'empreinte circule, jamais l'image.
+    photoHash: row.photo_hash ? cleanText(row.photo_hash, 128) : null,
+    photoUpdatedAt: normalizeDate(row.photo_updated_at),
+    preset: normalizePreset(row.preset),
   };
 }
 
@@ -64,11 +76,7 @@ function normalizeArticle(row) {
   const version = row.version;
 
   const photoHash = row.photo_hash ? cleanText(row.photo_hash, 128) : null;
-  let updatedAt = null;
-  if (row.updated_at) {
-    const ms = Date.parse(row.updated_at);
-    if (!Number.isNaN(ms)) updatedAt = new Date(ms).toISOString();
-  }
+  const updatedAt = normalizeDate(row.updated_at);
 
   return {
     id: row.id,
@@ -80,6 +88,7 @@ function normalizeArticle(row) {
     version,
     photoHash,
     updatedAt,
+    preset: normalizePreset(row.preset),
   };
 }
 
@@ -140,7 +149,14 @@ function groupMenu(categories, articles) {
   const byCat = new Map();
   for (const c of categories || []) {
     if (Number(c.actif) !== 1) continue;
-    byCat.set(c.id, { id: c.id, nom: c.nom, position: Number(c.position), articles: [] });
+    byCat.set(c.id, {
+      id: c.id,
+      nom: c.nom,
+      position: Number(c.position),
+      photoHash: c.photoHash || null,
+      preset: normalizePreset(c.preset),
+      articles: [],
+    });
   }
   const orphans = [];
   for (const a of articles || []) {
@@ -153,7 +169,14 @@ function groupMenu(categories, articles) {
   for (const g of groups) g.articles.sort((x, y) => x.nom.localeCompare(y.nom));
   if (orphans.length) {
     orphans.sort((x, y) => x.nom.localeCompare(y.nom));
-    groups.push({ id: null, nom: "Sans catégorie", position: Number.MAX_SAFE_INTEGER, articles: orphans });
+    groups.push({
+      id: null,
+      nom: "Sans catégorie",
+      position: Number.MAX_SAFE_INTEGER,
+      photoHash: null,
+      preset: normalizePreset(null),
+      articles: orphans,
+    });
   }
   return groups;
 }

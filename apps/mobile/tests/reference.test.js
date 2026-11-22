@@ -56,9 +56,17 @@ test("montants : somme de lignes en centimes (aucun flottant)", () => {
 // --- Catégories -----------------------------------------------------------
 test("catégorie valide : normalisée, actif explicite", () => {
   assert.deepEqual(normalizeCategory({ id: CAT, nom: "  Entrées  ", position: 2, actif: true }),
-    { id: CAT, nom: "Entrées", position: 2, actif: 1 });
+    {
+      id: CAT, nom: "Entrées", position: 2, actif: 1,
+      photoHash: null, photoUpdatedAt: null,
+      preset: { forme: "arrondi", cadrage: "cover", ratio: "1:1", rayon: 12, ombre: false },
+    });
   assert.deepEqual(normalizeCategory({ id: CAT, nom: "Entrées", actif: 0 }),
-    { id: CAT, nom: "Entrées", position: 0, actif: 0 });
+    {
+      id: CAT, nom: "Entrées", position: 0, actif: 0,
+      photoHash: null, photoUpdatedAt: null,
+      preset: { forme: "arrondi", cadrage: "cover", ratio: "1:1", rayon: 12, ombre: false },
+    });
 });
 
 test("catégorie invalide : motif explicite", () => {
@@ -78,6 +86,7 @@ test("article valide : prix en centimes, TVA à une décimale", () => {
   }), {
     id: ART, categorieId: CAT, nom: "Burger", prixTtcCents: 1250, tauxTva: 10,
     actif: 1, version: 3, photoHash: "abc", updatedAt: "2026-11-18T10:00:00.000Z",
+    preset: { forme: "arrondi", cadrage: "cover", ratio: "1:1", rayon: 12, ombre: false },
   });
   // Sans catégorie (article orphelin) : accepté.
   assert.equal(normalizeArticle({ id: ART, nom: "Eau", prix_ttc: 2, taux_tva: 5.5, version: 1 }).categorieId, null);
@@ -169,6 +178,31 @@ test("carte : article dont la catégorie est inactive → « Sans catégorie »"
   assert.deepEqual(groups.map((g) => g.nom), ["Sans catégorie"]);
 });
 
+test("carte : photo et style de catégorie transmis au rendu (et repli)", () => {
+  const groups = groupMenu(
+    [
+      {
+        id: CAT, nom: "Sandwich", position: 1, actif: 1, photoHash: "abc123",
+        preset: { forme: "carre", cadrage: "cover", ratio: "4:3", rayon: 8, ombre: true },
+      },
+    ],
+    [{
+      ...art(ART, "Chawarma", CAT),
+      photoHash: "def456",
+      preset: { forme: "cercle", cadrage: "contain", ratio: "1:1", rayon: 40, ombre: false },
+    }]
+  );
+  assert.equal(groups[0].photoHash, "abc123");
+  assert.deepEqual(groups[0].preset, { forme: "carre", cadrage: "cover", ratio: "4:3", rayon: 8, ombre: true });
+  assert.equal(groups[0].articles[0].photoHash, "def456");
+  assert.equal(groups[0].articles[0].preset.forme, "cercle");
+
+  // Une catégorie sans style explicite reçoit le défaut du menu, jamais null.
+  const plain = groupMenu([{ id: CAT2, nom: "Plats", position: 2, actif: 1 }], []);
+  assert.deepEqual(plain[0].preset, { forme: "arrondi", cadrage: "cover", ratio: "1:1", rayon: 12, ombre: false });
+  assert.equal(plain[0].photoHash, null);
+});
+
 test("carte vide : aucun groupe, aucune exception", () => {
   assert.deepEqual(groupMenu(null, null), []);
   assert.deepEqual(groupMenu([], []), []);
@@ -188,7 +222,13 @@ test("SQL : UPSERT catégories/articles/tables et désactivation des absents", (
   assert.match(S.UPSERT_CATEGORY_SQL, /ON CONFLICT\(id\) DO UPDATE SET/);
   assert.match(S.UPSERT_ARTICLE_SQL, /prix_ttc_cents = excluded\.prix_ttc_cents/);
   assert.match(S.UPSERT_TABLE_SQL, /ON CONFLICT\(id\) DO UPDATE SET/);
-  assert.deepEqual(S.upsertCategoryArgs({ id: CAT, nom: "E", position: 1, actif: 1 }), [CAT, "E", 1, 1]);
+  assert.deepEqual(
+    S.upsertCategoryArgs({
+      id: CAT, nom: "E", position: 1, actif: 1, photoHash: "h", photoUpdatedAt: null,
+      preset: { forme: "carre", cadrage: "contain", ratio: "4:3", rayon: 4, ombre: true },
+    }),
+    [CAT, "E", 1, 1, "h", null, "carre", "contain", "4:3", 4, 1]
+  );
   assert.deepEqual(S.upsertTableArgs({ id: TABLE, nom: "T1", salle: "Salle 1", places: 4, actif: 1 }),
     [TABLE, "T1", "Salle 1", 4, 1]);
   assert.equal(S.deactivateMissingCategoriesSql(2), "UPDATE categories SET actif = 0 WHERE id NOT IN (?,?)");

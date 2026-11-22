@@ -38,6 +38,11 @@ services:
       - "3000:3000"
     volumes:
       # Hot-reload : le code source est monté, node_modules vit dans son volume.
+      # Le manifeste et le lock racine sont montés pour que `npm ci` DANS le
+      # conteneur voie exactement les dépendances du dépôt (pas celles figées
+      # dans l'image au build).
+      - ./package.json:/repo/package.json:ro
+      - ./package-lock.json:/repo/package-lock.json:ro
       - ./apps/web:/repo/apps/web
       - ./packages/shared:/repo/packages/shared
       - ./infra/scripts:/repo/infra/scripts:ro

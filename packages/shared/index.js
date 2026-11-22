@@ -75,14 +75,54 @@ function validateCategory(body) {
   return { ok: true, value: { nom, position } };
 }
 
+// --- DTO présentation d'image (presets BO / menu / ticket / kiosque) ---
+// Une seule définition pour le back-office, l'API, le sync et la tablette :
+// forme, cadrage, ratio, rayon et ombre sont validés partout de la même façon.
+const IMAGE_FORMES = Object.freeze(["carre", "arrondi", "cercle", "bandeau"]);
+const IMAGE_CADRAGES = Object.freeze(["cover", "contain"]);
+const IMAGE_RATIOS = Object.freeze(["1:1", "4:3", "3:2", "16:9"]);
+const PRESET_CONTEXTES = Object.freeze(["bo", "menu", "ticket", "kiosque"]);
+
+const PRESET_DEFAUT = Object.freeze({
+  bo: Object.freeze({ nom: "BO — vignette", forme: "carre", cadrage: "cover", ratio: "1:1", rayon: 8, ombre: false }),
+  menu: Object.freeze({ nom: "Menu — arrondi", forme: "arrondi", cadrage: "cover", ratio: "1:1", rayon: 12, ombre: false }),
+});
+
+function validatePreset(body) {
+  const nom = String(body?.nom || "").trim();
+  const forme = String(body?.forme || "arrondi");
+  const cadrage = String(body?.cadrage || "cover");
+  const ratio = String(body?.ratio || "1:1");
+  const rayon = body?.rayon === undefined || body?.rayon === null ? 12 : Number(body.rayon);
+  const ombre = body?.ombre === true;
+  const contexte = String(body?.contexte || "menu");
+  const parDefaut = body?.par_defaut === true;
+  if (nom.length < 2 || nom.length > 40) return { ok: false, error: "Nom du style obligatoire (2–40 caractères)" };
+  if (!IMAGE_FORMES.includes(forme)) return { ok: false, error: "Forme invalide (carre, arrondi, cercle, bandeau)" };
+  if (!IMAGE_CADRAGES.includes(cadrage)) return { ok: false, error: "Cadrage invalide (cover, contain)" };
+  if (!IMAGE_RATIOS.includes(ratio)) return { ok: false, error: "Ratio invalide (1:1, 4:3, 3:2, 16:9)" };
+  if (!(Number.isInteger(rayon) && rayon >= 0 && rayon <= 64)) return { ok: false, error: "Arrondi invalide (0–64)" };
+  if (!PRESET_CONTEXTES.includes(contexte)) return { ok: false, error: "Contexte invalide (bo, menu, ticket, kiosque)" };
+  return {
+    ok: true,
+    value: { nom, forme, cadrage, ratio, rayon, ombre, contexte, par_defaut: parDefaut },
+  };
+}
+
 module.exports = {
   NF525_EVENT_TYPES,
   EVENT_TYPES_WITH_VALIDATOR,
   TAUX_TVA,
   PRIX_MIN,
   PRIX_MAX,
+  IMAGE_FORMES,
+  IMAGE_CADRAGES,
+  IMAGE_RATIOS,
+  PRESET_CONTEXTES,
+  PRESET_DEFAUT,
   validateArticle,
   validateTable,
   validateUserMobile,
   validateCategory,
+  validatePreset,
 };

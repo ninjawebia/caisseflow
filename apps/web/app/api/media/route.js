@@ -4,6 +4,7 @@ import { pool } from "../../../lib/db";
 import { assertSameOrigin, json, audit } from "../../../lib/http";
 import { licenceGate } from "../../../lib/license";
 import { validate, save, ALLOWED } from "../../../lib/uploads";
+import { ensureVariants } from "../../../lib/images";
 
 // GET /api/media — bibliothèque média du restaurant (tout le personnel
 // connecté en lecture). Chaque asset porte le nombre d'articles qui
@@ -59,6 +60,9 @@ export async function POST(req) {
   }
 
   const name = save(buf, v.ext);
+  // Dérivés WebP (thumb/card/full) : prêts avant la réponse, le BO ne sert
+  // jamais l'original de 5 Mo.
+  await ensureVariants(name);
   const ins = await pool.query(
     `INSERT INTO media (restaurant_id, file, hash, mime, bytes, width, height, created_by_email)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)

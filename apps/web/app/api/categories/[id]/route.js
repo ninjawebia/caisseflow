@@ -4,6 +4,7 @@ import { pool } from "../../../../lib/db";
 import { assertSameOrigin, json, audit } from "../../../../lib/http";
 import { licenceGate } from "../../../../lib/license";
 import { validateCategory } from "@caisseflow/shared";
+import { validPresetId } from "../../../../lib/presets";
 import { isUuid } from "../../../../lib/validate";
 
 // Chargement de la catégorie du restaurant de l'utilisateur (menu perm).
@@ -48,12 +49,17 @@ export async function PATCH(req, ctx) {
   if (body?.actif !== undefined) {
     changes.actif = body.actif === true;
   }
+  if (body?.preset_id !== undefined) {
+    const preset = await validPresetId(user.restaurantId, body.preset_id);
+    if (!preset.ok) return json({ error: preset.error }, 400);
+    changes.preset_id = preset.id;
+  }
   if (Object.keys(changes).length === 0) return json({ error: "Aucune modification" }, 400);
 
   const set = Object.keys(changes).map((k, i) => `${k} = $${i + 2}`).join(", ");
   try {
     const r = await pool.query(
-      `UPDATE categories SET ${set} WHERE id = $1 RETURNING id, nom, position, actif`,
+      `UPDATE categories SET ${set} WHERE id = $1 RETURNING id, nom, position, actif, preset_id`,
       [id, ...Object.values(changes)]
     );
     await audit(user, body?.actif !== undefined && Object.keys(changes).length === 1 ? (changes.actif ? "restore" : "archive") : "update", "categories", id, changes);

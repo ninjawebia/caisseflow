@@ -4,12 +4,14 @@
 // et gèle les lignes envoyées ; un ajout ultérieur forme un complément.
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image } from "expo-image";
 import { StatusBar } from "expo-status-bar";
 import { colors, font, radius, space } from "../ui/theme";
 import { formatEuros } from "../core/money";
+import { presetFrame, photoUri } from "../core/preset";
 
 export default function OrderScreen({
-  order, lines, totals, menu, busy, error, notice, user,
+  order, lines, totals, menu, busy, error, notice, user, serverUrl, token,
   onBack, onLock, onAddArticle, onSetQty, onRemove, onSend, onActivity, appVersion,
 }) {
   const groups = Array.isArray(menu) ? menu : [];
@@ -29,6 +31,20 @@ export default function OrderScreen({
     () => groups.find((g) => g.id === selected) || groups[0] || null,
     [groups, selected]
   );
+
+  // Images : le serveur exige le jeton d'appareil (la tablette n'a pas de
+  // cookie). Aucune photo n'est téléchargée si le jeton ou l'URL manque.
+  const imgHeaders = useMemo(
+    () => (token ? { Authorization: `Bearer ${token}` } : null),
+    [token]
+  );
+  const imageOf = (table, id, hash, variant) => (
+    imgHeaders ? photoUri(serverUrl, table, id, hash, variant) : null
+  );
+  const bannerUri = activeGroup
+    ? imageOf("categories", activeGroup.id, activeGroup.photoHash, "full")
+    : null;
+  const bannerFrame = activeGroup ? presetFrame(activeGroup.preset) : null;
 
   const pending = (lines || []).filter((l) => Number(l.envoyee) === 0);
   const sent = (lines || []).filter((l) => Number(l.envoyee) === 1);
@@ -88,6 +104,8 @@ export default function OrderScreen({
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
             {groups.map((g) => {
               const isActive = activeGroup && g.id === activeGroup.id;
+              const chipUri = imageOf("categories", g.id, g.photoHash, "thumb");
+              const frame = presetFrame(g.preset);
               return (
                 <Pressable
                   key={String(g.id)}
@@ -95,11 +113,37 @@ export default function OrderScreen({
                   style={[styles.chip, isActive && styles.chipActive]}
                   testID={`category-${g.nom}`}
                 >
+                  {chipUri ? (
+                    <Image
+                      source={{ uri: chipUri, headers: imgHeaders }}
+                      style={[styles.chipImage, { borderRadius: Math.min(frame.borderRadius, 12) }]}
+                      contentFit={frame.resizeMode}
+                      transition={120}
+                      testID={`category-image-${g.nom}`}
+                    />
+                  ) : null}
                   <Text style={[styles.chipText, isActive && styles.chipTextActive]}>{g.nom}</Text>
                 </Pressable>
               );
             })}
           </ScrollView>
+
+          {bannerUri ? (
+            <View
+              style={[styles.banner, { borderRadius: bannerFrame.borderRadius }]}
+              testID={`category-banner-${activeGroup.nom}`}
+            >
+              <Image
+                source={{ uri: bannerUri, headers: imgHeaders }}
+                style={styles.bannerImage}
+                contentFit={bannerFrame.resizeMode}
+                transition={180}
+              />
+              <View style={styles.bannerLabel}>
+                <Text style={styles.bannerLabelText} numberOfLines={1}>{activeGroup.nom}</Text>
+              </View>
+            </View>
+          ) : null}
 
           <ScrollView contentContainerStyle={styles.articles}>
             {!groups.length && (
@@ -119,6 +163,22 @@ export default function OrderScreen({
                 style={({ pressed }) => [styles.article, pressed && styles.articlePressed, busy && styles.disabled]}
                 testID={`article-${a.nom}`}
               >
+                {(() => {
+                  const uri = imageOf("articles", a.id, a.photoHash, "card");
+                  if (!uri) return null;
+                  const frame = presetFrame(a.preset);
+                  return (
+                    <View style={[styles.articleImageBox, { borderRadius: frame.borderRadius }]}>
+                      <Image
+                        source={{ uri, headers: imgHeaders }}
+                        style={styles.articleImage}
+                        contentFit={frame.resizeMode}
+                        transition={120}
+                        testID={`article-image-${a.nom}`}
+                      />
+                    </View>
+                  );
+                })()}
                 <Text style={styles.articleName} numberOfLines={2}>{a.nom}</Text>
                 <View style={styles.articleFoot}>
                   <Text style={styles.articlePrice}>{formatEuros(a.prixTtcCents)}</Text>
@@ -294,6 +354,9 @@ const styles = StyleSheet.create({
   menuPane: { flex: 1, paddingHorizontal: space(5), paddingTop: space(4) },
   chips: { gap: space(2), paddingBottom: space(3) },
   chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space(2),
     paddingHorizontal: space(4),
     paddingVertical: space(2),
     borderRadius: radius.pill,
@@ -304,10 +367,30 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { fontSize: 13, fontWeight: "700", color: colors.text },
   chipTextActive: { color: "#FFFFFF" },
+  chipImage: { width: 24, height: 24, borderRadius: 12, backgroundColor: "#E2E8F0" },
+  banner: {
+    height: 132,
+    marginBottom: space(3),
+    backgroundColor: "#E2E8F0",
+    overflow: "hidden",
+  },
+  bannerImage: { width: "100%", height: "100%" },
+  bannerLabel: {
+    position: "absolute",
+    left: space(3),
+    bottom: space(3),
+    paddingHorizontal: space(3),
+    paddingVertical: space(1),
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    maxWidth: "80%",
+  },
+  bannerLabelText: { fontSize: 13, fontWeight: "800", color: colors.text },
   articles: { flexDirection: "row", flexWrap: "wrap", gap: space(3), paddingBottom: space(5) },
   article: {
     width: 176,
     minHeight: 120,
+    overflow: "hidden",
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -317,6 +400,15 @@ const styles = StyleSheet.create({
   },
   articlePressed: { backgroundColor: colors.primarySoft, borderColor: "#BFDBFE" },
   disabled: { opacity: 0.55 },
+  articleImageBox: {
+    height: 92,
+    marginHorizontal: -space(3),
+    marginTop: -space(3),
+    marginBottom: space(2),
+    backgroundColor: "#E2E8F0",
+    overflow: "hidden",
+  },
+  articleImage: { width: "100%", height: "100%" },
   articleName: { fontSize: 14, fontWeight: "700", color: colors.text },
   articleFoot: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: space(2), marginTop: space(2) },
   articlePrice: { fontSize: 15, fontWeight: "800", color: colors.text },

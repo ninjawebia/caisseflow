@@ -1,59 +1,24 @@
 import { cookies } from "next/headers";
 import { getSessionUser, can } from "../../../../../lib/auth";
-import { deviceAuth } from "../../../../../lib/device";
 import { pool } from "../../../../../lib/db";
 import { assertSameOrigin, json, audit } from "../../../../../lib/http";
 import { licenceGate } from "../../../../../lib/license";
-import fs from "fs";
-import { validate, save, detectImage, ALLOWED, pathOf } from "../../../../../lib/uploads";
+import { validate, save, ALLOWED } from "../../../../../lib/uploads";
+import { ensureVariants } from "../../../../../lib/images";
+import { photoResponse } from "../../../../../lib/photos";
 import { isUuid } from "../../../../../lib/validate";
 
-// GET /api/articles/[id]/photo — sert le fichier (authentifié), ETag = SHA-256.
+// GET /api/articles/[id]/photo — sert le fichier (session web OU jeton
+// appareil). ?variant=thumb|card|full sert un dérivé WebP optimisé.
 export async function GET(req, ctx) {
   const { id } = await ctx.params;
-  const user = await getSessionUser(await cookies());
-  let restaurantId = user?.restaurantId;
-  if (!restaurantId) {
-    const device = await deviceAuth(req);
-    if (device) restaurantId = device.restaurantId;
-  }
-  if (!restaurantId) return json({ error: "Accès refusé" }, 403);
-  if (!isUuid(id)) return json({ error: "Article introuvable" }, 404);
-
-  const r = await pool.query(
-    "SELECT photo_file, photo_hash FROM articles WHERE id = $1 AND restaurant_id = $2",
-    [id, restaurantId]
-  );
-  const art = r.rows[0];
-  if (!art || !art.photo_file) return json({ error: "Aucune photo" }, 404);
-
-  const etag = `"${art.photo_hash?.slice(0, 16) || "1"}"`;
-  if (req.headers.get("if-none-match") === etag) {
-    return new Response(null, { status: 304, headers: { ETag: etag, "Cache-Control": "private, max-age=86400" } });
-  }
-  let buf;
-  try {
-    buf = fs.readFileSync(pathOf(art.photo_file));
-  } catch {
-    return json({ error: "Fichier photo introuvable" }, 404);
-  }
-  const type = detectImage(buf);
-  return new Response(buf, {
-    status: 200,
-    headers: {
-      "Content-Type": ALLOWED[type] || "application/octet-stream",
-      "Content-Length": String(buf.length),
-      ETag: etag,
-      "Cache-Control": "private, max-age=86400",
-      "X-Content-Type-Options": "nosniff",
-    },
-  });
+  return photoResponse(req, await cookies(), "articles", id, "Article introuvable");
 }
 
 // POST /api/articles/[id]/photo — upload/replace (gérant only, multipart).
-// Validation magic bytes + taille + dimensions (PRD 14.2), nom UUID serveur,
-// ancienne photo archivée (rétention 30 j). Traçabilité audit_log — JAMAIS
-// journal_replica (la gestion menu n'est pas un événement fiscal).
+// Validation magic bytes + taille + dimensions, nom UUID serveur, dérivés WebP
+// générés immédiatement. Traçabilité audit_log — JAMAIS journal_replica (la
+// gestion menu n'est pas un événement fiscal).
 export async function POST(req, ctx) {
   const { id } = await ctx.params;
   const csrf = assertSameOrigin(req);
@@ -64,7 +29,6 @@ export async function POST(req, ctx) {
   const lic = await licenceGate(user.restaurantId);
   if (!lic.ok) return json({ error: lic.error }, 403);
   if (!isUuid(id)) return json({ error: "Article introuvable" }, 404);
-
 
   const r = await pool.query(
     "SELECT id FROM articles WHERE id = $1 AND restaurant_id = $2",
@@ -85,11 +49,10 @@ export async function POST(req, ctx) {
   const v = validate(buf);
   if (!v.ok) return json({ error: v.error }, 400);
 
-  // Bibliothèque média (v0.4) : le contenu est DÉDUPLIQUÉ par hash — un
-  // fichier déjà présent est réutilisé (aucun nouveau fichier stocké) ;
-  // sinon il est enregistré ET ajouté à la bibliothèque. L'ancienne photo de
-  // l'article n'est PAS archivée : elle reste un asset réutilisable de la
-  // bibliothèque (le cycle de vie de l'asset est indépendant de l'article).
+  // Bibliothèque média : le contenu est DÉDUPLIQUÉ par hash — un fichier déjà
+  // présent est réutilisé (aucun nouveau fichier stocké) ; sinon il est
+  // enregistré ET ajouté à la bibliothèque. L'ancienne photo de l'article
+  // n'est PAS archivée : elle reste un asset réutilisable de la bibliothèque.
   const dup = await pool.query(
     "SELECT file, hash FROM media WHERE restaurant_id = $1 AND hash = $2",
     [user.restaurantId, v.hash]
@@ -105,7 +68,12 @@ export async function POST(req, ctx) {
       [user.restaurantId, name, v.hash, ALLOWED[v.ext], buf.length, v.w, v.h, user.email]
     );
   }
-  await pool.query("UPDATE articles SET photo_file = $1, photo_hash = $2 WHERE id = $3", [name, v.hash, id]);
+  // Dérivés WebP (thumb/card/full) : générés AVANT de répondre, pour que le BO
+  // et la tablette ne téléchargent jamais l'original.
+  await ensureVariants(name);
+  // `updated_at` est le curseur du pull DELTA : sans ce bump, une photo
+  // ajoutée après la dernière synchro ne serait JAMAIS transmise à la tablette.
+  await pool.query("UPDATE articles SET photo_file = $1, photo_hash = $2, updated_at = now() WHERE id = $3", [name, v.hash, id]);
   await audit(user, "photo_set", "articles", id, { hash: v.hash.slice(0, 12), size: buf.length, dedup: !!dup.rows[0] });
   return json({ ok: true, hash: v.hash.slice(0, 12) }, 201);
 }
@@ -138,12 +106,13 @@ export async function PATCH(req, ctx) {
   );
   if (!m.rows[0]) return json({ error: "Média introuvable dans la bibliothèque" }, 404);
 
-  await pool.query("UPDATE articles SET photo_file = $1, photo_hash = $2 WHERE id = $3", [m.rows[0].file, m.rows[0].hash, id]);
+  await ensureVariants(m.rows[0].file);
+  await pool.query("UPDATE articles SET photo_file = $1, photo_hash = $2, updated_at = now() WHERE id = $3", [m.rows[0].file, m.rows[0].hash, id]);
   await audit(user, "photo_set", "articles", id, { media_id: body.media_id, hash: m.rows[0].hash.slice(0, 12), source: "bibliotheque" });
   return json({ ok: true, hash: m.rows[0].hash.slice(0, 12) });
 }
 
-// DELETE /api/articles/[id]/photo — gérant only ; DéLIAISON simplement
+// DELETE /api/articles/[id]/photo — gérant only ; DÉLIAISON simplement
 // (champ NULL) : l'asset reste dans la bibliothèque, réutilisable pour un autre
 // article. La suppression DISQUE passe par /api/media/[id] (refusée si utilisée).
 export async function DELETE(req, ctx) {
@@ -157,7 +126,6 @@ export async function DELETE(req, ctx) {
   if (!lic.ok) return json({ error: lic.error }, 403);
   if (!isUuid(id)) return json({ error: "Article introuvable" }, 404);
 
-
   const r = await pool.query(
     "SELECT photo_file FROM articles WHERE id = $1 AND restaurant_id = $2",
     [id, user.restaurantId]
@@ -165,7 +133,7 @@ export async function DELETE(req, ctx) {
   if (!r.rows[0]) return json({ error: "Article introuvable" }, 404);
   if (!r.rows[0].photo_file) return json({ error: "Aucune photo à supprimer" }, 404);
 
-  await pool.query("UPDATE articles SET photo_file = NULL, photo_hash = NULL WHERE id = $1", [id]);
+  await pool.query("UPDATE articles SET photo_file = NULL, photo_hash = NULL, updated_at = now() WHERE id = $1", [id]);
   await audit(user, "photo_delete", "articles", id, { note: "déliaison — asset conservé en bibliothèque" });
   return json({ ok: true });
 }

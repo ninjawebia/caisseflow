@@ -133,7 +133,7 @@ async function main() {
   const bigHdr = Buffer.alloc(33);
   bigHdr.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
   bigHdr.writeUInt32BE(13, 8); bigHdr.write("IHDR", 12);
-  bigHdr.writeUInt32BE(3000, 16); bigHdr.writeUInt32BE(3000, 20);
+  bigHdr.writeUInt32BE(5000, 16); bigHdr.writeUInt32BE(5000, 20);
   bigHdr.set(Buffer.from([0x08, 0x06, 0x00, 0x00, 0x00]), 24);
   // Faux JPEG renommé : un PDF (magic bytes %PDF) portant l'extension .jpg
   const pdfRenamed = Buffer.concat([Buffer.from("%PDF-1.7 fake"), crypto.randomBytes(64)]);
@@ -152,9 +152,10 @@ async function main() {
   const pdf = await up(pdfRenamed, "fake.jpg");
   check("TC-BO1-PHOTO-002", pdf.status === 400, `HTTP ${pdf.status}`);
 
-  // TC-BO1-PHOTO-003 : > 2 Mo + dimensions > 2048 px
-  const big = await up(Buffer.concat([PNG1x1, crypto.randomBytes(2 * 1024 * 1024)]), "big.png");
-  const dims = await up(bigHdr, "3000.png");
+  // TC-BO1-PHOTO-003 : > 5 Mo + dimensions > 4096 px (limites portées en v0.5 :
+  // photo de téléphone acceptée, dérivés WebP générés côté serveur).
+  const big = await up(Buffer.concat([PNG1x1, crypto.randomBytes(5 * 1024 * 1024)]), "big.png");
+  const dims = await up(bigHdr, "5000.png");
   check("TC-BO1-PHOTO-003", big.status === 400 && dims.status === 400, `HTTP ${big.status}/${dims.status}`);
 
   // TC-BO1-PHOTO-009 : nom client malveillant → ignoré (nom UUID serveur)
