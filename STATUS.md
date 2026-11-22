@@ -309,4 +309,5 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | Nettoyage | `apps/web/package-lock.json` (obsolète, jamais utilisé par le Dockerfile) supprimé ; lock racine seul conservé. |
 | Gate sécurité | `security-audit.sh` **0 FAIL / 0 WARN / 20 PASS** ; `qa-check.sh` **0 FAIL / 0 WARN** (95 boutons / 53 handlers, blueprint présent). Re-chasse v0.5 documentée : `security/THREAT-MODEL.md` § 8, `security/REPORT.md` § 1 — 6 candidats rejetés avec preuves, 0 confirmé. |
 | Correctif outillage | `scripts/qa-check.sh` : les scans excluent désormais `node_modules`/`.next` (faux positifs `{{` dans le code compilé) et la détection de placeholder exige une vraie forme `{{nom}}` — les accolades JSX (`style={{…}}`) ne sont plus signalées. `security-audit.sh` : faux positif SQL corrigé dans la batterie (motif `LIKE` construit hors de l'appel). |
-| Commit | `a44e91e` (code + tests) |
+| APK | `output/apk/caisseflow-0.9.1-release.apk` (78 577 555 o, 2026-11-22 04:10) — `aapt2 dump badging` : `versionCode='9'`, `versionName='0.9.1'`. Image `mobile` reconstruite avant build (sources copiées dans l'image). **L'APK 0.9.0 du 19/11 ne contient pas l'UI images : il doit être remplacé.** |
+| Commit | `a44e91e` (code + tests), `1d8fae2` (doc + sécurité) |
