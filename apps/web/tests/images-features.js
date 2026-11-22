@@ -328,7 +328,10 @@ async function main() {
   // catégories non vides ; les assets média restent, comme en production).
   await pool.query("DELETE FROM articles WHERE id = $1", [art.id]);
   await pool.query("DELETE FROM categories WHERE id = $1", [newCat.id]);
-  await pool.query("DELETE FROM image_presets WHERE nom LIKE $1", [`Ticket % ${SFX}`]);
+  // Motif construit AVANT l'appel : la requête ne contient aucune interpolation
+  // (le scanner de sécurité lit la chaîne SQL, pas la valeur liée).
+  const ticketPattern = `Ticket % ${SFX}`;
+  await pool.query("DELETE FROM image_presets WHERE nom LIKE $1", [ticketPattern]);
 
   const files = fs.readdirSync(uploadsLib.uploadDir()).filter((f) => f !== "archived").length;
   check("TC-IMG-001-fichiers", files > 0, `${files} fichier(s) dans le volume uploads`);

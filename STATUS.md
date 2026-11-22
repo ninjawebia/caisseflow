@@ -291,3 +291,22 @@ Pièges documentés du cycle gate : premier `make test` après redémarrage à f
 | Doc | `README.md` : section « Tablette caisse (réseau local) » — adresse DHCP, relancer `make info` avant ré-enrôlement. |
 | Portée | Aucun changement d'application ni de données ; cible Make + documentation. |
 | Commit | `979417d` (poussé) |
+
+## Photos de catégories & presets de présentation — v0.5 (2026-11-22)
+
+| Élément | Résultat |
+| --- | --- |
+| Demande | Photos de catégories visibles dans le menu de la tablette, administration des styles d'image dans le BO, images **stylées et optimisées**, modèle **extensible** aux futurs écrans. Demande opérateur hors PRD initial → documentée PRD § 14.6, blueprint § 9.6, plan de test § 35. |
+| Modèle | Table générique `image_presets` : `nom`, `forme` (carre/arrondi/cercle/bandeau), `cadrage` (cover/contain), `ratio` (1:1, 4:3, 3:2, 16:9), `rayon` 0–64, `ombre`, `contexte` (bo/menu/ticket/kiosque), `par_defaut`. `categories.preset_id` et `articles.preset_id` **NULL = style par défaut du contexte**. Un seul défaut par `(restaurant, contexte)` via index partiel `uniq_preset_defaut`. Migration `0009_image_presentation.sql` + seed de `BO — vignette` et `Menu — arrondi`. |
+| Images | Upload porté à **5 Mo / 4096 px**, magic bytes conservés ; `sharp 0.35.5` génère trois dérivés **WebP q82** (EXIF corrigé, métadonnées supprimées) : `thumb` 160×160, `card` 480×480, `full` ≤ 1200 px. Original archivé, **jamais servi à l'UI**. Endpoint unique `?variant=…`, `ETag: hash-variant`, cache privé 24 h. |
+| Back-office | Page **`/apparence`** (gérant) : CRUD des styles, badge « Défaut », choix du défaut par contexte, aperçu **en direct** sur une vraie photo. Dans **`/menu`** : photo de catégorie (téléversement, bibliothèque, retrait), sélecteurs de style catégorie et article, vignettes en variante `thumb`. |
+| Tablette | Puces de catégories avec vignette 24 px, **bandeau** 132 px de la catégorie active (`full`), vignette 92 px sur chaque carte article (`card`), via `expo-image` + en-têtes du jeton d'appareil. Style **reçu résolu** par le pull (jamais recalculé) ; donnée absente → défaut du menu, aucun article masqué. |
+| Correctif clé | `POST/PATCH/DELETE /api/articles/:id/photo` ne bumpait **pas** `updated_at` : une photo ajoutée après la dernière synchro n'entrait jamais dans le pull **delta** (symptôme : « photo ajoutée au BO, invisible sur la tablette »). Les trois écritures bumpent désormais le curseur. |
+| Droits RBAC | Styles et photos en écriture = **gérant** (`menu`) ; lecture des images = personnel connecté **ou** jeton d'appareil ; gate licence conservé sur toutes les écritures. Lecture des styles ouverte au personnel (le BO en a besoin). |
+| Fichiers | Web : `lib/presets.js`, `lib/images.js`, `lib/photos.js`, `lib/preset-frame.js`, `app/api/presets{,/[id]}`, `app/api/categories/[id]/photo`, `app/apparence/`, `components/ApparenceClient.js`, `components/MenuClient.js`, `app/api/sync/pull`, `db/migrations/0009` ; mobile : `src/core/preset.js`, migration 6, `src/db/reference-sql.js`, `src/screens/OrderScreen.js` ; partagé : `validatePreset` + constantes dans `packages/shared`. |
+| Tests | Web **188/188 PASS** (`TC-PRESET` 15, `TC-CATPHOTO` 13, `TC-SYNCMG` 3, plus `TC-BO1-PHOTO` et `TC-MED` mis à jour pour les dérivés et les limites 5 Mo/4096) ; mobile **144/144 PASS** dont `TC-IMG-PRESET` 6 cas et migration 6. Total **332 PASS / 0 FAIL**, après purge du cache `.next`, `make up` et `make migrate`. |
+| Vérification SSR | `/apparence` 200 (aperçu en direct présent) ; `/menu` 200 (input photo catégorie + lien « Administrer les styles » présents) ; images servies 200 `image/webp` avec jeton d'appareil (thumb 5 984 o, card 24 886 o). |
+| Nettoyage | `apps/web/package-lock.json` (obsolète, jamais utilisé par le Dockerfile) supprimé ; lock racine seul conservé. |
+| Gate sécurité | `security-audit.sh` **0 FAIL / 0 WARN / 20 PASS** ; `qa-check.sh` **0 FAIL / 0 WARN** (95 boutons / 53 handlers, blueprint présent). Re-chasse v0.5 documentée : `security/THREAT-MODEL.md` § 8, `security/REPORT.md` § 1 — 6 candidats rejetés avec preuves, 0 confirmé. |
+| Correctif outillage | `scripts/qa-check.sh` : les scans excluent désormais `node_modules`/`.next` (faux positifs `{{` dans le code compilé) et la détection de placeholder exige une vraie forme `{{nom}}` — les accolades JSX (`style={{…}}`) ne sont plus signalées. `security-audit.sh` : faux positif SQL corrigé dans la batterie (motif `LIKE` construit hors de l'appel). |
+| Commit | `a44e91e` (code + tests) |

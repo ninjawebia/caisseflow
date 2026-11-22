@@ -868,3 +868,86 @@ Batterie **rerun-safe** : poste dédié `POSTE-77`, jeton aléatoire à chaque r
 **Exécution du 2026-11-21** : web **156/156 PASS** (dont TC-PAG 15/15) ; mobile **135/135** ; total **291 PASS / 0 FAIL**, deux passages consécutifs identiques (batterie en lecture seule, donc rerun-safe).
 
 **Note de test** : le rendu SSR de Next insère `<!-- -->` entre les nœuds texte dynamiques ; `TC-PAG-014` compare donc le HTML débarrassé de ces marqueurs (`Registre des exports (<!-- -->4<!-- -->)`).
+
+## 35. Photos de catégories & presets de présentation — TC-PRESET / TC-CATPHOTO / TC-SYNCMG / TC-IMG (v0.5, PRD ch. 14.6, implémenté le 2026-11-22)
+
+> Demande opérateur : photos de catégories dans le menu de la tablette, champ
+> photo catégorie dans le BO, images **stylées et redimensionnées**, interface
+> d'administration des styles réutilisable et **extensible**.
+>
+> Contrat : un preset décrit uniquement la présentation (forme, cadrage, ratio,
+> rayon, ombre, contexte) ; `preset_id = NULL` = style par défaut du contexte.
+> Upload **5 Mo / 4096 px** → dérivés WebP `thumb` 160, `card` 480, `full` ≤1200.
+> La tablette reçoit le style **déjà résolu** par le pull et ne télécharge que
+> des dérivés.
+
+### 35.1 Styles d'image — `TC-PRESET` (web, gérant)
+
+| ID | Précondition | Action | Attendu | Statut |
+| --- | --- | --- | --- | --- |
+| TC-PRESET-001 | — | `GET /api/presets` sans session | 403 | PASS |
+| TC-PRESET-002 | Gérant | `GET /api/presets` | 200, un défaut `bo` et un défaut `menu` | PASS |
+| TC-PRESET-003 | Comptable | `GET /api/presets` | 200 (lecture autorisée) | PASS |
+| TC-PRESET-004 | Comptable | `POST /api/presets` | 403 (écriture gérant) | PASS |
+| TC-PRESET-005 | Gérant | 5 charges invalides (nom, forme, ratio, rayon, contexte) | 400 chacune | PASS |
+| TC-PRESET-006 | Gérant | `POST` style valide | 201, valeurs conservées | PASS |
+| TC-PRESET-007 | Gérant | même nom | 409 (unicité `restaurant, nom`) | PASS |
+| TC-PRESET-008 | Gérant | `PATCH` nom + forme | 200 | PASS |
+| TC-PRESET-009 | Comptable | `PATCH` | 403 | PASS |
+| TC-PRESET-010 | Gérant | deux styles `par_defaut` contexte `ticket` | 1 seul défaut en base | PASS |
+| TC-PRESET-011 | Gérant | `DELETE` style par défaut | 409 | PASS |
+| TC-PRESET-012 | Gérant | `DELETE` style affecté à une catégorie | 409 | PASS |
+| TC-PRESET-013 | Gérant | `PATCH` catégorie avec preset inconnu | 400 (jamais cross-tenant) | PASS |
+| TC-PRESET-014 | Gérant | `DELETE` style libre | 200 | PASS |
+| TC-PRESET-015 | — | `audit_log` | traces `preset_create/update/delete` | PASS |
+
+### 35.2 Photos de catégories — `TC-CATPHOTO` (web, gérant)
+
+| ID | Précondition | Action | Attendu | Statut |
+| --- | --- | --- | --- | --- |
+| TC-CATPHOTO-001 | Catégorie de test | `POST /api/categories/:id/photo` (JPEG) | 201 + hash | PASS |
+| TC-CATPHOTO-002 | — | relecture SQL | `photo_file`, `photo_hash`, `photo_updated_at` renseignés | PASS |
+| TC-CATPHOTO-003 | — | variantes `thumb/card/full` | WebP `160×160`, `480×480`, ≤1200 px ; thumb < card en octets | PASS |
+| TC-CATPHOTO-004 | — | `GET` sans variante | original JPEG servi (archivé, jamais utilisé par l'UI) | PASS |
+| TC-CATPHOTO-005 | — | `If-None-Match` | 304 ; ETag de variante distinct de l'original | PASS |
+| TC-CATPHOTO-006 | — | `GET` sans session | 403 | PASS |
+| TC-CATPHOTO-007 | Comptable | `POST` | 403 | PASS |
+| TC-CATPHOTO-008 | — | fichier > 5 Mo | 400 « 5 Mo maximum » | PASS |
+| TC-CATPHOTO-009 | — | PDF renommé `.jpg` | 400 (magic bytes) | PASS |
+| TC-CATPHOTO-010 | — | PNG 4100 px de large | 400 « 4096 » | PASS |
+| TC-CATPHOTO-011 | Média existant | `PATCH {media_id}` | 200, hash du média repris | PASS |
+| TC-CATPHOTO-012 | — | `PATCH` média inconnu | 404 | PASS |
+| TC-CATPHOTO-013 | — | `DELETE` | 200, déliaison ; asset conservé en bibliothèque | PASS |
+
+### 35.3 Propagation vers la tablette — `TC-SYNCMG` (web, jeton appareil)
+
+| ID | Précondition | Action | Attendu | Statut |
+| --- | --- | --- | --- | --- |
+| TC-SYNCMG-001 | Catégorie avec photo + style | `POST /api/sync/pull` | `photo_hash` + `preset` résolu (forme/rayon) | PASS |
+| TC-SYNCMG-002 | Article avec photo | pull delta `since` = maintenant − 1 min | article présent avec `photo_hash` (`updated_at` bumpé par l'upload) | PASS |
+| TC-SYNCMG-003 | — | `GET` variante `thumb` avec jeton | 200 `image/webp` | PASS |
+
+### 35.4 Tablette — `TC-IMG-PRESET` / base locale (mobile, Node pur)
+
+| ID | Précondition | Action | Attendu | Statut |
+| --- | --- | --- | --- | --- |
+| TC-IMG-PRESET-001 | — | `normalizePreset(null / {} / "x")` | défaut menu (arrondi 12, cover, 1:1) | PASS |
+| TC-IMG-PRESET-002 | — | champs invalides | repli champ par champ, jamais de rejet de ligne | PASS |
+| TC-IMG-PRESET-003 | — | `rayon` −5 / 999 / 8.6 | 0 / 64 / 9 ; `null` → défaut | PASS |
+| TC-IMG-PRESET-004 | — | `presetFrame` | ratios 1 / 4⁄3 / 1.5 / 16⁄9 ; cercle 9999 ; carré ≤ 8 ; ombre → elevation | PASS |
+| TC-IMG-PRESET-005 | — | `photoUri` | URL variante + `v=hash[0..8]`, `null` si donnée manquante | PASS |
+| TC-IMG-PRESET-006 | — | `presetFromRow` (colonnes `preset_*`) | reconstruction exacte ; colonnes NULL → défaut | PASS |
+| TC-M4-REF (carte) | — | `groupMenu` avec photo/preset | photo et style portés par le groupe **et** l'article ; défaut sinon | PASS |
+| TC-M4-DB (migration 6) | Base neuve | colonnes photos/styles + `saveReference` puis `readMenu` | valeurs persistées ; ligne sans style → défaut | PASS |
+
+### 35.5 Vérification manuelle (tablette physique)
+
+| ID | Action | Attendu |
+| --- | --- | --- |
+| TC-UI-IMG-001 | Gérant : `/apparence` crée « Vignette ronde » (cercle), l'affecte à une catégorie | style listé, badge « Défaut » correct, aperçu en direct sur photo réelle |
+| TC-UI-IMG-002 | `/menu` → catégorie « Sandwich » : téléverser une photo 5 Mo, choisir un style | vignette 40 px, message de succès, style conservé après rechargement |
+| TC-UI-IMG-003 | Tablette : synchroniser puis ouvrir une commande | vignette dans la puce « Sandwich », bandeau de la catégorie, vignette sur la carte article |
+| TC-UI-IMG-004 | Tablette : catégorie sans photo | puce et liste en texte, aucun cadre vide |
+| TC-UI-IMG-005 | BO : remplacer la photo d'un article déjà synchronisé | après sync delta, la tablette affiche la nouvelle image (pas l'ancienne) |
+
+**Exécution du 2026-11-22** : web **188/188 PASS** (dont TC-PRESET 15/15, TC-CATPHOTO 13/13, TC-SYNCMG 3/3) ; mobile **144/144 PASS** (dont TC-IMG-PRESET 6 cas) ; total **332 PASS / 0 FAIL**, après purge du cache `.next`, `make up` et `make migrate`. Batteries rerun-safe : catégorie, article, styles et appareil de test supprimés/révoqués en fin de passage ; `audit_log` conservé.

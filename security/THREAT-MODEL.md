@@ -59,7 +59,7 @@ données réelles (règles d'engagement du workflow/06 §1).
 | Tablette→API | spoof de poste (token aléatoire hashé) | réécriture du journal (chaînage SHA-256 vérifié à l'insert, idempotence UUID) | ref/uuid + horloge journalisées | pull ne renvoie que le tenant du token | lot borné, transactionnel | un poste ne pousse que son propre journal |
 | API→DB | — | injection SQL (100 % paramétré, pas de concat de valeurs) | — | isolation tenant par `restaurant_id` dans chaque requête | pas de UPDATE/DELETE possible sur les 3 tables fiscales (règles SQL) | rôles applicatifs limités aux droits de la connexion |
 | Admin→tenant | compte admin dédié | état de licence audité | audit | admin sans accès aux données fiscales | — | permission `licence` distincte |
-| Upload média (navigateur→API) | vol de session (cookie HttpOnly) | contenu validé par MAGIC BYTES (jamais le nom/Content-Type client), ≤ 2 Mo, ≤ 2048 px, nom UUID généré serveur | audit `media_upload` / `media_delete` / `photo_set` | `Content-Type` détecté serveur + `nosniff` ; dossier privé derrière la session | plafond taille/dimensions par fichier ; dédup par hash (pas de duplication abusive) | RBAC : lecture tout le personnel, écriture gérant + gate licence ; suppression d'asset utilisée refusée |
+| Upload média (navigateur→API) | vol de session (cookie HttpOnly) | contenu validé par MAGIC BYTES (jamais le nom/Content-Type client), ≤ **5 Mo**, ≤ **4096 px** (v0.5), nom UUID généré serveur | audit `media_upload` / `media_delete` / `photo_set` / `preset_*` | `Content-Type` détecté serveur + `nosniff` ; dossier privé derrière la session ; dérivés WebP seuls exposés (original archivé) | plafond taille/dimensions par fichier ; dédup par hash (pas de duplication abusive) ; dimensionnement `sharp` borné (thumb/card/full) | RBAC : lecture personnel **ou jeton d'appareil**, écriture gérant + gate licence ; suppression d'asset utilisée refusée |
 | Clé de licence (gérant→API) | activation gérant only | signature Ed25519 vérifiée EN LOCAL contre la clé publique du logiciel | audit `licence_activate` | clé publique surchargeable par `LICENSE_PUBLIC_KEY` (prod) | — | clé = `CF-<payload>.<sig>` liée au restaurant (rid), expiration en payload |
 
 ## 6. Contrôles revendiqués (et où ils vivent)
@@ -79,7 +79,9 @@ données réelles (règles d'engagement du workflow/06 §1).
 | Hachage mots de passe / PIN bcrypt cost 10 | `app/api/users-mobile`, seed, login |
 | Chemin de fichiers borné (exports) | `app/app/api/exports/[id]/route.js` (basename + préfixe de répertoire) |
 | Dégradation de licence sans blocage fiscal | `lib/device.js syncAllowed()`, `/api/licence/status` |
-| Validation uploads (magic bytes, ≤ 2 Mo, ≤ 2048 px, nom UUID serveur) | `lib/uploads.js` (`validate`, `save`), appliquée photos d'articles ET bibliothèque média |
+| Validation uploads (magic bytes, ≤ 5 Mo, ≤ 4096 px, nom UUID serveur) | `lib/uploads.js` (`validate`, `save`), appliquée photos d'articles, de **catégories** et bibliothèque média |
+| Dérivés WebP bornés, EXIF corrigé, métadonnées supprimées (v0.5) | `lib/images.js` (sharp), `lib/photos.js`; variantes `thumb/card/full` seulement |
+| Presets d'image : défaut unique par contexte, style d'un autre tenant refusé | `db/migrations/0009_image_presentation.sql` (index partiel `uniq_preset_defaut`), `lib/presets.js`, `validatePreset` dans `packages/shared` |
 | Bibliothèque média : dédup par hash, suppression refusée si utilisée | `app/api/media/*`, garde-fou applicatif (400 + nb_articles) |
 | Gate licence sur les écritures (8 endpoints + sync pull) | `lib/license.js licenceGate()` |
 | Clé de licence : paire owner hors dépôt, paire DEV gitignorée + ROTÉE (2026-11-17) | `Makefile license-keygen` / `license-devkey`, `lib/license.js publicKeyPem()` (priorité env > disque > constante) |
@@ -92,3 +94,18 @@ données réelles (règles d'engagement du workflow/06 §1).
   du PRD, non exécutables dans cet environnement : le stockage local du PIN
   (Keychain/Keystore) et la rétention 6 ans côté tablette sont couverts par le
   PRD mais pas testés ici.
+
+## 8. Révision v0.5 — images et présentation (2026-11-22)
+
+Nouvelle surface : photos de **catégories**, styles `image_presets`, variantes
+d'images et propagation par le pull. Analyse bornée, sans nouvelle frontière
+réseau :
+
+| Candidat | Verdict | Preuve |
+| --- | --- | --- |
+| Injection SQL via `preset_id` / nom de style | rejeté | valeurs liées `$n` ; `validatePreset` refuse forme/ratio/rayon/contexte hors listes ; `preset_id` d'un autre restaurant → 400 (TC-PRESET-013) |
+| Lecture d'image sans autorisation | rejeté | session **ou** jeton d'appareil exigé, sinon 403 (TC-CATPHOTO-006, TC-SYNCMG-003) ; nom de fichier = UUID serveur, jamais l'entrée client |
+| Écriture de style/photo par un rôle non autorisé | rejeté | comptable → 403 sur POST/PATCH (TC-PRESET-004/009, TC-CATPHOTO-007) ; gate licence conservé |
+| Fichier malveillant déguisé en image | rejeté | magic bytes + `sharp` re-décode ; PDF renommé → 400 (TC-CATPHOTO-009) ; > 5 Mo / > 4096 px → 400 |
+| Fuite de l'original haute définition | rejeté | l'UI ne reçoit que `thumb/card/full` ; l'original exige une requête explicite sans variante et reste derrière la même auth |
+| Cross-tenant sur les presets | rejeté | toutes les requêtes scopées `restaurant_id` (session ou jeton) |

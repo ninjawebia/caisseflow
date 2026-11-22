@@ -13,7 +13,7 @@
 | --- | --- |
 | Authentification | E-mail + mot de passe (bcrypt), sessions courtes révocables, RBAC 4 rôles (gérant, second, comptable, auditeur, admin plateforme), protection CSRF par Origin |
 | Dashboard | KPI ventes, TVA multi-taux, activité 7 jours, dernières écritures |
-| Menu | Articles (prix HT/TTC, TVA), catégories (créer/renommer/archiver/supprimer), photos (JPEG/PNG/WebP, ≤ 2 Mo, ≤ 2048 px, dédup), bibliothèque média, recherche et tri |
+| Menu | Articles (prix HT/TTC, TVA), catégories (créer/renommer/archiver/supprimer), photos (JPEG/PNG/WebP, ≤ 5 Mo, ≤ 4096 px, dérivés WebP, dédup), bibliothèque média, styles d'image (`/apparence`), recherche et tri |
 | Utilisateurs | Comptes web et **matricules mobiles** (rôle + PIN 4–6 chiffres, bcrypt), blocage après 5 échecs |
 | Tables | CRUD tables et salles |
 | Journal NF525 | Journal répliqué append-only, chaînage SHA-256, vérification par poste, sync push idempotente |

@@ -1005,7 +1005,7 @@ Ajouter, remplacer et supprimer une photo par article, avec stockage persistant 
 
 **Restrictions :**
 - **Formats** : JPEG/PNG/WebP uniquement — validation serveur par **magic bytes** (jamais le `Content-Type` du client, jamais le nom de fichier).
-- **Taille** : ≤ 2 Mo ; dimensions ≤ 2048 px — redimensionnement/re-encodage côté serveur (dans le conteneur) + vignette 512 px générée pour les listes.
+- **Taille** : ≤ 5 Mo ; dimensions ≤ 4096 px (limites portées de 2 Mo/2048 px à la v0.5 pour accepter une photo de téléphone) — le serveur génère des dérivés **WebP** `thumb` 160×160, `card` 480×480 et `full` ≤ 1200 px, orientation EXIF corrigée et métadonnées supprimées ; l'original est archivé, jamais servi à l'UI.
 - **Nom de fichier** : généré aléatoirement côté serveur (UUID) — le nom fourni par le client n'est jamais conservé (injection de chemin, XSS via nom).
 - **Stockage** : répertoire de données persistant monté en **volume Docker** (dev) / volume Dokploy ou stockage objet S3-compatible (prod) ; chemin référencé en base (`articles.photo_url` — migration SQL versionnée). **PAS sur l'hôte** : données applicatives, pas des fichiers d'exploitation (voir README « Arborescence et fichiers modifiables »).
 - **Remplacement** : l'ancienne photo est archivée puis purgée (rétention 30 j) — jamais écrasée en place, pour laisser le temps aux tablettes de re-télécharger via cache ETag.
@@ -1060,6 +1060,59 @@ Améliorer l'affichage des pages en paginant les listes longues du back-office.
 **Droits RBAC :** inchangés — la pagination est un affichage en lecture ; chaque page reste protégée par les mêmes contrôles (session, rôle, périmètre restaurant).
 
 **Points techniques :** `apps/web/lib/pagination.js` (source unique) + composant partagé `components/Pagination.js` ; batterie `TC-PAG` (15 cas) en lecture seule.
+
+### 14.6 [IMPLÉMENTÉ v0.5] Photos de catégories & presets de présentation (demande opérateur du 2026-11-22)
+
+Ajouter des photos de catégories visibles dans le menu de la tablette, et une
+interface d'administration des styles d'image (articles **et** catégories), dans
+un modèle **extensible** aux futurs écrans (ticket, kiosque).
+
+**Modèle — un seul objet de présentation :**
+
+| Élément | Détail |
+| --- | --- |
+| `image_presets` | `nom`, `forme` (carre/arrondi/cercle/bandeau), `cadrage` (cover/contain), `ratio` (1:1, 4:3, 3:2, 16:9), `rayon` (0–64), `ombre`, `contexte` (bo/menu/ticket/kiosque), `par_defaut` |
+| Lien | `categories.preset_id` et `articles.preset_id` — **NULL = style par défaut du contexte** |
+| Unicité | un seul `par_defaut` par `(restaurant, contexte)` — index partiel `uniq_preset_defaut` |
+| Défauts créés | `BO — vignette` (bo, carré 8 px) et `Menu — arrondi` (menu, arrondi 12 px) |
+| Photos de catégories | `photo_file`, `photo_hash`, `photo_updated_at` — même contrat que les articles |
+
+**Images :** l'upload accepte **5 Mo / 4096 px** (photo de téléphone), puis le
+serveur génère trois dérivés **WebP qualité 82**, orientation EXIF corrigée et
+métadonnées supprimées : `thumb` 160×160 (puces, tableaux), `card` 480×480
+(cartes article), `full` ≤ 1200 px (bandeau). L'original est conservé (archive)
+mais **jamais téléchargé** par le BO ni la tablette. Endpoint unique
+`?variant=thumb|card|full`, ETag `hash-variant`, cache privé 24 h.
+
+**Back-office :** page **`/apparence`** (gérant) — CRUD des styles, badge
+« Défaut », choix du défaut par contexte, aperçu **en direct** sur une vraie
+photo du restaurant. Dans **`/menu`** : photo de catégorie (téléversement,
+bibliothèque, retrait) et sélecteur de style par catégorie et par article ;
+les vignettes utilisent la variante `thumb`.
+
+**Tablette :** puces de catégories avec vignette, **bandeau** de la catégorie
+active (`full`) et **vignette** sur chaque carte article (`card`), servis avec
+le jeton d'appareil. Le style est reçu **résolu** par le pull (jamais recalculé
+localement) ; une valeur absente ou invalide retombe sur le défaut du menu sans
+jamais masquer un article.
+
+**Propagation hors ligne :** le pull renvoie `photo_hash` et `preset` pour les
+catégories (pull complet) et les articles (delta). Toute écriture qui change
+l'affichage (photo, style) **bump `updated_at`** — sans quoi une photo ajoutée
+après la dernière synchro ne serait jamais transmise.
+
+**Extensibilité :** ajouter un écran = ajouter une valeur de `contexte` et
+réutiliser les mêmes presets ; aucune nouvelle table, aucun nouveau contrat.
+
+**Droits RBAC :** gestion des styles et des photos = **gérant** (`menu`) ;
+lecture des images = personnel connecté **ou** jeton d'appareil ; gate licence
+conservé sur toutes les écritures.
+
+**Points techniques :** `packages/shared` (`validatePreset`, constantes),
+`apps/web/lib/presets.js`, `lib/images.js` (sharp), `lib/photos.js`,
+`lib/preset-frame.js`, `apps/mobile/src/core/preset.js` ; batteries
+`TC-PRESET` 15 cas, `TC-CATPHOTO` 13 cas, `TC-SYNCMG` 3 cas, `TC-IMG` (mobile)
+13 cas.
 
 ## 15. Explicitly Rejected Features (Scope Guardrails)
 

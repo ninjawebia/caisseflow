@@ -13,6 +13,7 @@ Comptes : fictifs (seed) · Production : jamais contactée.
 | Leads `needs_validation` (faits de déploiement) | 2 (NV-1 seed, NV-2 TLS) — voir `NEEDS-VALIDATION.md` |
 | Classe d'attaque | upload de fichiers **désormais applicable** (photos + bibliothèque média) — chassé et rejeté (REJ-009/010/011) |
 | Contrôles positifs vérifiés | 6 (voir §3) + validation uploads et gate licence testés par batteries (TC-BO1-PHOTO, TC-MED, TC-LIC) |
+| **Révision v0.5 (2026-11-22)** | Uploads portés à **5 Mo / 4096 px** + dérivés WebP (`thumb/card/full`), photos de **catégories**, presets d'image et propagation par le pull. Re-chasse ciblée : `security/THREAT-MODEL.md` § 8 — 6 candidats rejetés avec preuves, **0 confirmé**. Gate statique relancé : **20 PASS / 0 FAIL / 0 WARN** (TC-PRESET 15, TC-CATPHOTO 13, TC-SYNCMG 3, TC-MED 16, TC-BO1-PHOTO 12). |
 
 ## 2. Chasse manuelle par classe (workflow/06 §4)
 
@@ -30,7 +31,7 @@ Comptes : fictifs (seed) · Production : jamais contactée.
 | Chaîne d'approvisionnement | aucun défaut | dépendances minimales épinglées, `next@15.5.29` corrigé de la CVE connue ; `npm audit --deps` à relancer au moment du déploiement |
 | Redirection | aucun défaut | logout : cible constante `/login`, base `APP_ORIGIN` hors requête ; `?next=https://evil.example` ignoré (REJ-008) |
 | **Ré-audit v0.2→v0.4 (2026-11-17)** | | |
-| Upload de fichiers (photos + média) | aucun défaut | magic bytes jamais le nom/Content-Type client, ≤ 2 Mo, ≤ 2048 px, UUID serveur, type re-détecté au servage + `nosniff` (REJ-011 ; batteries TC-BO1-PHOTO 12/12, TC-MED 16/16) |
+| Upload de fichiers (photos + média) | aucun défaut | magic bytes jamais le nom/Content-Type client, ≤ 2 Mo, ≤ 2048 px, UUID serveur, type re-détecté au servage + `nosniff` (REJ-011 ; batteries TC-BO1-PHOTO 12/12, TC-MED 16/16). **v0.5 : limites portées à 5 Mo / 4096 px, dérivés WebP seuls exposés — re-testé par TC-CATPHOTO/TC-SYNCMG, même verdict.** |
 | Traversée de chemin média | aucun défaut | `file` jamais alimenté par la requête client (UUID serveur), `pathOf` uniquement avec des valeurs de base (REJ-009) |
 | IDOR média cross-tenant | aucun défaut | scoping `restaurant_id` (session) sur les 3 routes média ; 404 sur identifiant étranger (REJ-010) |
 | Clés de licence | **1 confirmé corrigé** | paire DEV versionnée dans l'historique git (SEC-003) → rotation, désuivi, clé publique chargée du disque ; prod = LICENSE_PUBLIC_KEY (paire owner) |
@@ -53,7 +54,7 @@ Comptes : fictifs (seed) · Production : jamais contactée.
 | Pas de quota sur `/api/sync/*`, `/api/exports` | Accepté | endpoints authentifiés par jeton/mdp ; à réévaluer si exposition publique directe |
 | CDN Tailwind dans le layout | Accepté pour la démonstration | à remplacer par un bundle local + CSP stricte avant production (recommandation, pas un défaut atteignable) |
 | TOTP désactivé par défaut | Accepté | fonctionnel et prêt ; activation recommandée pour les rôles comptable/auditeur/admin |
-| Pas de quota par tenant sur `/api/media` / photos | Accepté pour le pilote | plafond par fichier (2 Mo/2048 px) + dédup par hash + écriture réservée au gérant (personnel interne, hors modèle de menace) ; à réévaluer si exposition externe |
+| Pas de quota par tenant sur `/api/media` / photos | Accepté pour le pilote | plafond par fichier (5 Mo/4096 px depuis v0.5, dérivés WebP bornés) + dédup par hash + écriture réservée au gérant (personnel interne, hors modèle de menace) ; à réévaluer si exposition externe |
 | Paire DEV de licence jamais versionnée | **Décision appliquée (2026-11-17)** | SEC-003 : rotation de la paire, `git rm --cached` + `.gitignore`, génération idempotente `make license-devkey`, serveur de dev charge la clé publique du disque ; l'ancienne clé (historique git) est réputée compromise et ne signe plus rien d'accepté |
 | Jetons de démonstration prévisibles | non-bloquant, conditionné au déploiement | traité en NV-1 (le seed ne doit jamais courir en production) |
 
